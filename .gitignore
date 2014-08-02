@@ -1,0 +1,12 @@
+build/
+dist/
+*.egg-info/
+.settings/
+.project
+.pydevproject
+*.npz
+*.png
+*.pyc
+*.*~
+test/data*/
+test/result*/

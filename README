@@ -1,0 +1,40 @@
+###################################################################################
+pmfcalculator: A package to compute 1D and 2D potential of mean force profiles
+##################################################################################
+LICENSE:
+See LICENSE.txt
+
+
+INSTALLATION:
+
+Installation prerequists:
+------------------------
+numpy
+cython
+pyYaml
+-------------------------
+
+Installation Instructions
+---------------------------------------------
+python setup.py install --prefix $install_dir
+substitute $install_dir with directory location
+ where you want this package to reside.
+----------------------------------------------
+
+
+USAGE:
+----------------------------------------------------------------------------------------------------------------------------------
+calc1dpmf.py and calc2dpmf.py are the main scripts that needs to be invoked to compute
+1d and 2d profiles respectively.
+
+For 1d profiles, only harmonic potentials are implimented
+For 2d profiles, harmonic and cosine potential are implimented
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
