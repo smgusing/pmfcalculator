@@ -46,9 +46,9 @@ function test_1d_zhu {
 
 cd test1d
 
-calc1dpmf_Zhu.py -projfile dummy.yaml -maxiter 10000  \
+calc1dpmf.py -projfile dummy.yaml -maxiter 10000  \
 -nbins 100 -tolerance 1e-7 -chkdur 500 -temperature 300 \
--range 0.0 7.95 -nbootstrap 4 -zerofe 7 -l debug 
+-range 0.0 7.95 -nbootstrap 4 -zerofe 7 -l debug -method ZHU
 
 if  [[ -f  "pmf1d3.txt" ]]
 then
@@ -181,7 +181,7 @@ case "$1" in
         
         
     *)
-        echo $"usage: $0:{ gen_1d_test_data| test_1d_wham | gen_2d_test_data | test_2d_wham}"
+        echo $"usage: $0:{ gen_1d_test_data| test_1d_wham | test_1d_zhu | gen_2d_test_data | test_2d_wham }"
         exit 1
 esac
     

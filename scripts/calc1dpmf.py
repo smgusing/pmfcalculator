@@ -4,7 +4,7 @@ import argparse
 import logging, sys, os
 import numpy.random as nprand
 import pmfcalculator 
-from pmfcalculator.pmf1d import Wham1d
+from pmfcalculator.pmf1d import Wham1d,Zhu1d
 import pmfcalculator.StatsUtils as utils
 
  
@@ -17,6 +17,8 @@ des = '''calc1dpmf.py: Calculate 1d pmf.
 
 parser = argparse.ArgumentParser(description=des    
     , formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+parser.add_argument("-method", dest='method', default='WHAM', help='WHAM | ZHU | MBAR ')
 
 parser.add_argument("-projfile", dest='prjfile', default='proj.yaml', help='Project file')
 
@@ -109,10 +111,19 @@ def main(args):
         ineff = np.load(args.inefffile)['arr_0']
     
     bias = pmfcalculator.HarmonicBias()
-    calc = Wham1d(bias, maxiter=args.maxiter, tol=args.tol, nbins=args.nbins,
+    
+    if args.method == "WHAM":
+        calc = Wham1d(bias, maxiter=args.maxiter, tol=args.tol, nbins=args.nbins,
                   temperature=args.temperature,
                   x0=x0, fcx=kx,chkdur=args.chkdur)
-
+    elif args.method == "ZHU":
+        calc = Zhu1d(bias, maxiter=1, tol=args.tol, nbins=args.nbins,
+                  temperature=args.temperature,
+                  x0=x0, fcx=kx, g_k=ineff, chkdur=args.chkdur)
+    else:
+        logger.error("method %s not implimented yet, please choose between WHAM or ZHU")
+        raise SystemExit()
+    
     if not os.path.isfile(args.histfile):
         logger.info("histogram file %s not found", args.histfile)
         calc.make_histogram(pos_kn=pos_kn, N_k=N_k, binrange=args.binrange)
