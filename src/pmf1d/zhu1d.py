@@ -13,146 +13,100 @@ np.seterr(all='raise',under='warn')
 logger = logging.getLogger(__name__)
 
 
-# ################################################33
-# def calcA(dG,nmidp, hist, U_b, beta, N_k):
-#     S = N_k.size
-#     lg = np.zeros(S,dtype=np.float)
-#     lg[1:] = np.cumsum(dG)
-#     g = np.exp(lg)
-#        
-#     part1 = (N_k*lg).sum() 
-#              
-#      
-#     #print "dG",dG
-#     part2 = 0
-#     for i in xrange(nmidp):
-#          num = hist[i]
-#          if num > 0:
-#              denom = N_k*U_b[i,:] * g
-#              try:
-#                  part2 += num * np.log(num/denom.sum())
-#              except FloatingPointError:
-#                  pass
-#                   
-#      
-#     A = -( part1 + part2)
-#     print "A", A              
-#     return A
-# #     
-# def calcAder(dG,nmidp, hist, U_b, beta, N_k):
-#     S = N_k.size
-#     lg = np.zeros(S,dtype=np.float)
-#     lg[1:] = np.cumsum(dG)
-#     derv = np.zeros_like(dG)
-#     g = np.exp(lg)
-#     
-#     for i in range(1,S):
-#         part2 = 0   
-#           
-#         for ii in xrange(nmidp):
-#             num = hist[ii] * U_b[ii,i] 
-#             if num > 0:
-#                 denom = N_k*U_b[ii,:] * g
-#                 try:
-#                     part2 += num/denom.sum()  
-#                 except FloatingPointError:
-#                     pass
-#          
-#         derv[i-1] = N_k[i]*((g[i]*part2) -1) 
-#      
-#     dervcum = np.cumsum(derv)
-#      
-#     dervcum = dervcum[::-1]
-#     print "DERV",dervcum
-#      
-#     return dervcum
-
-# def minimize1d(F_k,nmidp, hist, U_b,
-#                                 beta, N_k,g_k,chkdur):
-#     
-#     # convert fe to dG
-#     dG = np.zeros(F_k.size-1)
-#     F_knew = np.zeros_like(F_k)
-#     U_b = np.exp(-beta*U_b)
-#     res = opt.fmin_ncg(calcA,x0=dG,fprime=calcAder,args=(nmidp, hist, U_b,
-#                        beta, N_k),avextol=1e-07)
-#     
-#     F_knew[1:] = np.exp(np.cumsum(res)) -1
-#     return F_knew
-#     
-
-# def compute_logsum(numpyArray):
-#     ''' return log of sum of exponent of array
-#     '''
-#     
-#     ArrayMax = numpyArray.max()
-#     
-#     return np.log(np.exp(numpyArray - ArrayMax ).sum() ) + ArrayMax
 
     
-def calcA(x, nmidp, hist, U_bexp, beta, N_k):
-    S = N_k.size
-    lf = np.zeros(S)
-    lf[1:] += x  
-    f = np.exp(lf)
-    part1 = (N_k * lf).sum() 
-    # print "G",g
+def calcA(g, M, c, beta, N):
+    ''' use equation 19 '''
+    
+    nbins = M.size
+
+        
     part2 = 0
-    for i in xrange(nmidp):
-        num = hist[i]
-        if num > 0:
+    for i in xrange(nbins):
+        if M[i] > 0:
             # denom = np.log(N_k) + (-beta*U_b[i,:]) + g
             try:
-                denom = N_k * U_bexp[i, :] * f
-                part2 += num * np.log(num / denom.sum())
+                denom = N * c[i, :] * np.exp(g)
+                part2 += M[i] * np.log(M[i] / denom.sum() )
                 # part2 += num * (np.log(num)-compute_logsum(denom))
             except FloatingPointError:
                 pass
-                  
+              
      
-    A = (-1 * part1) + (-1* part2)
-    print "A", A              
+    A = (-1. * (N * g).sum() ) + (-1. * part2)
+    
+    print "A", A 
+    #print "G", g             
+    
     return A
      
-def calcAder(x,nmidp, hist, U_bexp, beta, N_k):
-    S = N_k.size
-    derv = np.zeros(S-1)
-    lf = np.zeros(S)
-    lf[1:] += x  
-    f = np.exp(lf)
-    #print "G",g
-    for i in range(1,S):
-        part2 = 0   
-          
-        for ii in xrange(nmidp):
-            num = hist[ii] * U_bexp[ii,i] 
-            #denom = np.log(N_k) + (-beta*U_b[ii,i]) + g
-            try:
-                denom = N_k*U_bexp[ii,:] * f
-                #part2 += (np.log(num)-compute_logsum(denom))
-                part2 += num/denom.sum()    
-            except FloatingPointError:
-                pass
-         
-        derv[i-1] = N_k[i]*(f[i]*part2 -1) 
-     
-     
-    #print "DERV",derv
-     
+def calcAder(g,M, c, beta, N):
+    ''' use equation 20
+    '''
+    nbins = M.size
+    nsims = N.size
+    
+    # calculate p
+    p = np.zeros(nbins)
+    
+    for i in range(nbins):
+        denom = ( N * np.exp(g) * c[i,:] ).sum() 
+        try:
+            p[i] = M[i]/ denom 
+        
+        except:
+            p[i] = 0.
+        
+        
+    derv = np.zeros(nsims)
+    #print "P", p
+    
+    for i in range(nsims):
+        derv[i] = N[i] * np.exp(g[i]) * ( (p * c[:,i]).sum() - 1.)
+        
+    #print "DER", derv    
     return derv
+        
 
-def minimize1d(F_k,nmidp, hist, U_b,
-                                beta, N_k,g_k,chkdur):
+def minimize1d(F_k, M, U_b, beta, N, chkdur):
+    ''' use equation 18, 19, 20 
+    
+    Parameters
+    -------------
+    
+    F_k : array type
+        Free energy of simulation k
+    
+    M : array_type
+        1D array with frequency in each bin.
+    
+    U_b : array_type
+       2D array [nbins,nsims], baising potential at bin i evaluated using bias from simulation k
+       
+    N : array_type
+        Total number of samples from simulation k
+        
+    
+    '''
+    
      
-    # convert fe to dG
-    x = np.zeros(F_k.size-1)
-    U_bexp = np.exp(-beta*U_b)
-    res = opt.fmin_ncg(calcA,x0=x,fprime=calcAder,args=(nmidp, hist, U_bexp,
-                       beta, N_k),avextol=1e-07)
-    F_knew = np.zeros_like(F_k)
-    F_knew[1:] = res
-     
-    return F_knew
+    # convert f to g = log(f)
+    g = np.copy(F_k)
+    g[np.where(g == 0.0)] = 1.0
+    g = np.log(g) 
+    c = np.exp(-beta*U_b)
+
+    res = opt.fmin_cg(calcA,x0=g,fprime=calcAder,args=(M, c,
+                        beta, N),full_output=True,maxiter = 2)
+    F_k = np.exp(res.x)
+#     print "sss", g
+    
+#     res = opt.fmin_powell(calcA,x0=g,args=(M, c,
+#                        beta, N),full_output=True,)
+    
+#    print "old" , F_k
+    print "new",  res 
+    return F_k
     
 
 
@@ -172,7 +126,25 @@ class Zhu1d(Pmf1d):
     def estimateFreeEnergy(self,F_k = None, histogramfile = None, 
                                   fefile = None,g_k = None, chkpointfile = ".fe.npz",
                                   setToZero=None) :
-        '''Compute 1D pmf using the given project and input arguments'''
+        '''Estimates F_k 
+        
+        Parameters
+        ---------------
+                F_k : array type
+                Free energy for simulation k
+
+                histogramfile : npz file 
+                
+                fefile : npz file
+                
+                g_k : array type
+                    statistical inefficiency
+
+                chkpointfile: npz file
+
+                setToZero: float
+                    collective variable where PMF profile should be set to zero
+        '''
         
         nbins = self.nbins
         beta = self.beta
@@ -236,9 +208,8 @@ class Zhu1d(Pmf1d):
                 itr += self.chkdur
              
             
-            F_knew = minimize1d(F_k,nmidp,
-                                self.hist,self.U_b,
-                                self.beta, self.N_k,g_k, self.chkdur)
+            F_knew = minimize1d(F_k, self.hist,self.U_b,
+                                self.beta, self.N_k, self.chkdur)
 
             err_k = np.abs(F_knew - F_k)
             av_err = np.average(err_k)

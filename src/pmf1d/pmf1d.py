@@ -85,12 +85,25 @@ class Pmf1d(object):
     def make_histogram(self, pos_kn = None, N_k = None, binrange = None):
         ''' Construct histogram
         
-        Parameters: pos_kn: list of arrays
-                        consisting of observation of reaction coordinate
-                    N_k: array
-                        Number of observation in each window
-                    binrange: list of lists
-                        binrange of histogram
+        Parameters
+        ------------
+            pos_kn: list of arrays
+                 n observations of k simulations
+                 
+            N_k: array
+                Number of observation in each window
+                
+            binrange: list of lists
+                binrange of histogram
+        
+        Returns
+        ------------
+        None
+        
+        attributes
+        ------------
+            histogram: hist[k,nbins] number of enteries in bin i from simulation k 
+         
                            
         '''
         
@@ -105,7 +118,7 @@ class Pmf1d(object):
         # 
         sample_indices = np.zeros([K, N_max], dtype=np.bool)
         for k in range(0, K):
-           sample_indices[k, 0:N_k[k]] = True
+            sample_indices[k, 0:N_k[k]] = True
         
         if binrange is None:
             logger.info("Using automatic determination of bin ranges")
@@ -117,20 +130,20 @@ class Pmf1d(object):
             
             # Update N_k according to range
             for k in range(0, K):
-               # posmin  and posmax are included 
-               idx=( pos_kn[k, 0:N_k[k]] >= pos_min) * (pos_kn[k, 0:N_k[k]] <= pos_max)
-               npoints = np.count_nonzero(idx)
-               if  npoints == 0:
-                   logger.warn("No samples are considered from window %s",k)
-                   #msg = ("Handling of such situation is not implemented",
-                   #       "Either remove the corresponding files, or change bin range")
-                   #logger.warn("%s","\n".join(msg))
-                   logger.warn("Dim1 min %s, max %s, n %s ",pos_kn[k, 0:N_k[k] ].min(),pos_kn[k, 0:N_k[k]].max(),N_k[k])
-                   #raise SystemExit("Exiting .. Sorry!")
-               else:
-                   N_k[k] = npoints
-                   logger.debug("New sample numbers %s %s",k,N_k[k]) 
-            
+                # posmin  and posmax are included 
+                idx=( pos_kn[k, 0:N_k[k]] >= pos_min) * (pos_kn[k, 0:N_k[k]] <= pos_max)
+                npoints = np.count_nonzero(idx)
+                if  npoints == 0:
+                    logger.warn("No samples are considered from window %s",k)
+                    #msg = ("Handling of such situation is not implemented",
+                    #       "Either remove the corresponding files, or change bin range")
+                    #logger.warn("%s","\n".join(msg))
+                    logger.warn("Dim1 min %s, max %s, n %s ",pos_kn[k, 0:N_k[k] ].min(),pos_kn[k, 0:N_k[k]].max(),N_k[k])
+                    #raise SystemExit("Exiting .. Sorry!")
+                else:
+                    N_k[k] = npoints
+                    logger.debug("New sample numbers %s %s",k,N_k[k]) 
+                
         
         
         #pos_max += (pos_max - pos_min) / (nbins)
