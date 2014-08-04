@@ -48,7 +48,7 @@ cd test1d
 
 calc1dpmf.py -projfile dummy.yaml -maxiter 10000  \
 -nbins 100 -tolerance 1e-7 -chkdur 500 -temperature 300 \
--range 0.0 7.95 -nbootstrap 4 -zerofe 7 -l debug -method ZHU
+-range 0.0 7.95 -nbootstrap 4 -zerofe 7 -l info -method ZHU
 
 if  [[ -f  "pmf1d3.txt" ]]
 then

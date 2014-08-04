@@ -21,16 +21,18 @@ def calcA(g, M, c, beta, N):
     nbins = M.size
 
         
-    part2 = 0
+    part2 = 0.0
     for i in xrange(nbins):
         if M[i] > 0:
             # denom = np.log(N_k) + (-beta*U_b[i,:]) + g
             try:
-                denom = N * c[i, :] * np.exp(g)
-                part2 += M[i] * np.log(M[i] / denom.sum() )
+                denom = ( N * c[i, :] * np.exp(g) ).sum()
+                part2 += M[i] * np.log(M[i] / denom ) 
                 # part2 += num * (np.log(num)-compute_logsum(denom))
             except FloatingPointError:
                 pass
+        else:
+            pass
               
      
     A = (-1. * (N * g).sum() ) + (-1. * part2)
@@ -48,7 +50,6 @@ def calcAder(g,M, c, beta, N):
     
     # calculate p
     p = np.zeros(nbins)
-    
     for i in range(nbins):
         denom = ( N * np.exp(g) * c[i,:] ).sum() 
         try:
@@ -62,7 +63,7 @@ def calcAder(g,M, c, beta, N):
     #print "P", p
     
     for i in range(nsims):
-        derv[i] = N[i] * np.exp(g[i]) * ( (p * c[:,i]).sum() - 1.)
+        derv[i] = N[i] * np.exp(g[i]) * ( (p * c[:,i] ).sum() - 1.)
         
     #print "DER", derv    
     return derv
@@ -107,6 +108,123 @@ def minimize1d(F_k, M, U_b, beta, N, chkdur):
 #    print "old" , F_k
     print "new",  res 
     return F_k
+
+
+def calcA_dg(dg, M, c, beta, N):
+    ''' using equation 22a  '''
+    
+    nbins = M.size
+    nsims = N.size
+    
+    g = np.zeros(nsims)
+    g[1:] = np.cumsum(dg)
+    
+        
+    part2 = 0.0
+    for i in xrange(nbins):
+        if M[i] > 0:
+            # denom = np.log(N_k) + (-beta*U_b[i,:]) + g
+            try:
+                denom = ( N * c[i, :] * np.exp(g) ).sum()
+                part2 += M[i] * np.log(M[i] / denom ) 
+                # part2 += num * (np.log(num)-compute_logsum(denom))
+            except FloatingPointError:
+                pass
+        else:
+            pass
+              
+     
+    A = (-1. * (N * g).sum() ) + (-1. * part2)
+    
+    print "A", A 
+    #print "G", g             
+    
+    return A
+
+def calcA_dg_der(dg,M, c, beta, N):
+    ''' use equation 20
+    '''
+
+    nbins = M.size
+    nsims = N.size
+
+    
+    g = np.zeros(nsims)
+    g[1:] = np.cumsum(dg)
+
+    
+    # calculate p
+    p = np.zeros(nbins)
+    for i in range(nbins):
+        denom = ( N * np.exp(g) * c[i,:] ).sum() 
+        try:
+            p[i] = M[i]/ denom 
+        
+        except:
+            p[i] = 0.
+        
+        
+    derv = np.zeros(nsims)
+    #print "P", p
+    
+    for i in range(nsims):
+        derv[i] = N[i] * np.exp(g[i]) * ( (p * c[:,i] ).sum() - 1.)
+    
+    derv_cum = np.cumsum(derv[1:])    
+    #print "DER", derv    
+    return derv_cum
+
+
+
+def minimize1d_1(F_k, M, U_b, beta, N, chkdur):
+    ''' use equation 21a -- 22b 
+    
+    Parameters
+    -------------
+    
+    F_k : array type
+        Free energy of simulation k
+    
+    M : array_type
+        1D array with frequency in each bin.
+    
+    U_b : array_type
+       2D array [nbins,nsims], baising potential at bin i evaluated using bias from simulation k
+       
+    N : array_type
+        Total number of samples from simulation k
+        
+    
+    '''
+    
+    # convert f to g = log(f)
+    g = np.copy(F_k)
+    g[np.where(g == 0.0)] = 1.0
+    g = np.log(g)
+    c = np.exp(-beta*U_b)
+    
+    dg = g[1:] - g[:-1]
+    
+    res = opt.fmin_cg(calcA_dg,x0=dg,fprime=calcA_dg_der,args=(M, c,
+                        beta, N),full_output=True)
+    print "new",  res 
+
+    sys.exit()
+    F_k = np.exp(res[0])
+#     print "sss", g
+    
+#     res = opt.fmin_powell(calcA,x0=g,args=(M, c,
+#                        beta, N),full_output=True,)
+    
+#    print "old" , F_k
+    return F_k
+
+
+
+
+
+
+
     
 
 
@@ -208,7 +326,7 @@ class Zhu1d(Pmf1d):
                 itr += self.chkdur
              
             
-            F_knew = minimize1d(F_k, self.hist,self.U_b,
+            F_knew = minimize1d_1(F_k, self.hist,self.U_b,
                                 self.beta, self.N_k, self.chkdur)
 
             err_k = np.abs(F_knew - F_k)
