@@ -19,12 +19,11 @@ cd test1d ; ./gen_1d_testdata.py ; cd ..
 function test_1d_wham {
 
 cd test1d
-
 calc1dpmf.py -projfile dummy.yaml -maxiter 10000  \
 -nbins 100 -tolerance 1e-7 -chkdur 500 -temperature 300 \
 -range 0.0 7.95 -nbootstrap 4 -zerofe 7 -l info 
 
-if  [[ -f  "pmf1d3.txt" ]]
+if  [[ -f  "pmf1d.txt" ]]
 then
     ./plot_1d_results.py
     
@@ -48,9 +47,9 @@ cd test1d
 
 calc1dpmf.py -projfile dummy.yaml -maxiter 10000  \
 -nbins 100 -tolerance 1e-7 -chkdur 500 -temperature 300 \
--range 0.0 7.95 -nbootstrap 4 -zerofe 7 -l info -method ZHU
+-range 0.0 7.95 -nbootstrap 0 -zerofe 7 -l info -method ZHU
 
-if  [[ -f  "pmf1d3.txt" ]]
+if  [[ -f  "pmf1d.txt" ]]
 then
     ./plot_1d_results.py
     

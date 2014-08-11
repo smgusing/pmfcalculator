@@ -41,7 +41,8 @@ def main():
     ax=fig.add_subplot(111)
     plot_ref(ax,"refpmf.dat")
     
-    results = ["pmf1d%s.txt"%i for i in range(4)]
+    #results = ["pmf1d%s.txt"%i for i in range(4)]
+    results = ["pmf1d.txt"]
     plot_res(ax,results)
     
     ax.legend(loc="lower right")

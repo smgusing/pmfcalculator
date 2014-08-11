@@ -117,8 +117,6 @@ int c_update_F_k1d(long N, long nmidp,double* F_k,
 	int i,k;
 	double logbf[N];
 	double denom,feZero;
-	//casting crap. So that I can use easy indexing rather than
-	// pointer arthemetics
 	double (*U_b)[N] = (double (*)[N]) U_bi;
 
 	for (k=0; k<N; k++)

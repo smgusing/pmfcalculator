@@ -12,37 +12,39 @@ np.seterr(all='raise',under='warn')
 
 logger = logging.getLogger(__name__)
 
+def compute_logsum(numpyArray):
+    ''' return log of sum of exponent of array
+    '''
+    
+    ArrayMax = numpyArray.max()
+    
+    return np.log(np.exp(numpyArray - ArrayMax ).sum() ) + ArrayMax
 
 
     
-def calcA(g, M, c, beta, N):
+def calcA(g, M, log_c, beta, N):
     ''' use equation 19 '''
     
     nbins = M.size
-
-        
+    logN = np.log(N)
+    
+            
     part2 = 0.0
     for i in xrange(nbins):
         if M[i] > 0:
-            # denom = np.log(N_k) + (-beta*U_b[i,:]) + g
-            try:
-                denom = ( N * c[i, :] * np.exp(g) ).sum()
-                part2 += M[i] * np.log(M[i] / denom ) 
-                # part2 += num * (np.log(num)-compute_logsum(denom))
-            except FloatingPointError:
-                pass
+            denom =  compute_logsum( logN + log_c[i, :] + g ) 
+            part2 = part2 + ( M[i] * (np.log(M[i]) - denom ) ) 
         else:
             pass
               
      
-    A = (-1. * (N * g).sum() ) + (-1. * part2)
+    A = (-(N * g).sum() ) - part2
     
     print "A", A 
-    #print "G", g             
     
     return A
      
-def calcAder(g,M, c, beta, N):
+def calcAder(g,M, log_c, beta, N):
     ''' use equation 20
     '''
     nbins = M.size
@@ -51,7 +53,7 @@ def calcAder(g,M, c, beta, N):
     # calculate p
     p = np.zeros(nbins)
     for i in range(nbins):
-        denom = ( N * np.exp(g) * c[i,:] ).sum() 
+        denom = np.exp(compute_logsum( np.log(N) + g + log_c[i,:] ) ) 
         try:
             p[i] = M[i]/ denom 
         
@@ -60,16 +62,15 @@ def calcAder(g,M, c, beta, N):
         
         
     derv = np.zeros(nsims)
-    #print "P", p
     
     for i in range(nsims):
-        derv[i] = N[i] * np.exp(g[i]) * ( (p * c[:,i] ).sum() - 1.)
+        derv[i] = N[i] * (np.exp(g[i]) *  (p * np.exp(log_c[:,i]) ).sum() - 1.)
         
     #print "DER", derv    
     return derv
         
 
-def minimize1d(F_k, M, U_b, beta, N, chkdur):
+def minimize1d(F_k, M, U_b, beta, g_k, N, chkdur, windowZero):
     ''' use equation 18, 19, 20 
     
     Parameters
@@ -90,142 +91,133 @@ def minimize1d(F_k, M, U_b, beta, N, chkdur):
     
     '''
     
-     
-    # convert f to g = log(f)
     g = np.copy(F_k)
-    g[np.where(g == 0.0)] = 1.0
-    g = np.log(g) 
-    c = np.exp(-beta*U_b)
+    bounds = [(None,None) for i in range(g.size)]
+    bounds[windowZero] = (0,0)
+    print bounds
+    
+    log_c = -beta*U_b
 
-    res = opt.fmin_cg(calcA,x0=g,fprime=calcAder,args=(M, c,
-                        beta, N),full_output=True,maxiter = 2)
-    F_k = np.exp(res.x)
-#     print "sss", g
+    res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(M, log_c,
+                        beta, N),factr =10, bounds = bounds)
+    F_k = res[0]
     
-#     res = opt.fmin_powell(calcA,x0=g,args=(M, c,
-#                        beta, N),full_output=True,)
-    
-#    print "old" , F_k
-    print "new",  res 
     return F_k
 
 
-def calcA_dg(dg, M, c, beta, N):
-    ''' using equation 22a  '''
-    
-    nbins = M.size
-    nsims = N.size
-    
-    g = np.zeros(nsims)
-    g[1:] = np.cumsum(dg)
-    
-        
-    part2 = 0.0
-    for i in xrange(nbins):
-        if M[i] > 0:
-            # denom = np.log(N_k) + (-beta*U_b[i,:]) + g
-            try:
-                denom = ( N * c[i, :] * np.exp(g) ).sum()
-                part2 += M[i] * np.log(M[i] / denom ) 
-                # part2 += num * (np.log(num)-compute_logsum(denom))
-            except FloatingPointError:
-                pass
-        else:
-            pass
-              
-     
-    A = (-1. * (N * g).sum() ) + (-1. * part2)
-    
-    print "A", A 
-    #print "G", g             
-    
-    return A
-
-def calcA_dg_der(dg,M, c, beta, N):
-    ''' use equation 20
-    '''
-
-    nbins = M.size
-    nsims = N.size
-
-    
-    g = np.zeros(nsims)
-    g[1:] = np.cumsum(dg)
-
-    
-    # calculate p
-    p = np.zeros(nbins)
-    for i in range(nbins):
-        denom = ( N * np.exp(g) * c[i,:] ).sum() 
-        try:
-            p[i] = M[i]/ denom 
-        
-        except:
-            p[i] = 0.
-        
-        
-    derv = np.zeros(nsims)
-    #print "P", p
-    
-    for i in range(nsims):
-        derv[i] = N[i] * np.exp(g[i]) * ( (p * c[:,i] ).sum() - 1.)
-    
-    derv_cum = np.cumsum(derv[1:])    
-    #print "DER", derv    
-    return derv_cum
-
-
-
-def minimize1d_1(F_k, M, U_b, beta, N, chkdur):
-    ''' use equation 21a -- 22b 
-    
-    Parameters
-    -------------
-    
-    F_k : array type
-        Free energy of simulation k
-    
-    M : array_type
-        1D array with frequency in each bin.
-    
-    U_b : array_type
-       2D array [nbins,nsims], baising potential at bin i evaluated using bias from simulation k
-       
-    N : array_type
-        Total number of samples from simulation k
-        
-    
-    '''
-    
-    # convert f to g = log(f)
-    g = np.copy(F_k)
-    g[np.where(g == 0.0)] = 1.0
-    g = np.log(g)
-    c = np.exp(-beta*U_b)
-    
-    dg = g[1:] - g[:-1]
-    
-    res = opt.fmin_cg(calcA_dg,x0=dg,fprime=calcA_dg_der,args=(M, c,
-                        beta, N),full_output=True)
-    print "new",  res 
-
-    sys.exit()
-    F_k = np.exp(res[0])
-#     print "sss", g
-    
-#     res = opt.fmin_powell(calcA,x0=g,args=(M, c,
-#                        beta, N),full_output=True,)
-    
-#    print "old" , F_k
-    return F_k
-
-
-
-
-
-
-
-    
+# def calcA_dg(dg, M, c, beta, N):
+#     ''' using equation 22a  '''
+#     
+#     nbins = M.size
+#     nsims = N.size
+#     
+#     g = np.zeros(nsims)
+#     g[1:] = np.cumsum(dg)
+#     
+#         
+#     part2 = 0.0
+#     for i in xrange(nbins):
+#         if M[i] > 0:
+#             # denom = np.log(N_k) + (-beta*U_b[i,:]) + g
+#             try:
+#                 denom = compute_logsum( np.log(N) + np.log(c[i, :]) + g )
+#                 part2 += M[i] * ( np.log(M[i]) - denom) 
+#                 # part2 += num * (np.log(num)-compute_logsum(denom))
+#             except FloatingPointError:
+#                 pass
+#         else:
+#             pass
+#               
+#      
+#     A = (-1. * (N * g).sum() ) + (-1. * part2)
+#     
+#     print "A", A 
+#     #print "G", g             
+#     
+#     return A
+# 
+# def calcA_dg_der(dg,M, c, beta, N):
+#     ''' use equation 20
+#     '''
+# 
+#     nbins = M.size
+#     nsims = N.size
+# 
+#     
+#     g = np.zeros(nsims)
+#     g[1:] = np.cumsum(dg)
+# 
+#     
+#     # calculate p
+#     p = np.zeros(nbins)
+#     print g,"XXXX"
+#     for i in range(nbins):
+#         denom = ( N * np.exp(g) * c[i,:] ).sum() 
+#         try:
+#             p[i] = M[i]/ denom 
+#         
+#         except:
+#             p[i] = 0.
+#         
+#         
+#     derv = np.zeros(nsims)
+#     #print "P", p
+#     
+#     for i in range(1,nsims):
+#         derv[i] = N[:i].sum() * (np.exp(g[i]) *  (p * c[:,i]).sum() - 1.)
+#     
+#     print "DDDD", derv
+#     derv_cum = derv[1:]
+#     #derv_cum = np.cumsum(derv[1:])    
+#     #print "DER", derv    
+#     return derv_cum
+# 
+# 
+# 
+# def minimize1d_1(F_k, M, U_b, beta, g_k, N, chkdur, windowZero):
+#     ''' use equation 21a -- 22b 
+#     
+#     Parameters
+#     -------------
+#     
+#     F_k : array type
+#         Free energy of simulation k
+#     
+#     M : array_type
+#         1D array with frequency in each bin.
+#     
+#     U_b : array_type
+#        2D array [nbins,nsims], baising potential at bin i evaluated using bias from simulation k
+#        
+#     N : array_type
+#         Total number of samples from simulation k
+#         
+#     
+#     '''
+#     
+#     # convert f to g = log(f)
+#     g = np.zeros_like(F_k)
+# #     g[np.where(g == 0.0)] = 1.0
+# #     g = np.log(g)
+#     c = np.exp(-beta*U_b)
+#     
+#     dg = g[1:] - g[:-1]
+#     
+#     res = opt.fmin_ncg(calcA_dg,x0=dg,fprime=calcA_dg_der,args=(M, c,
+#                         beta, N),full_output=True)
+#     print "new",  res 
+# 
+#     sys.exit()
+#     F_k = np.exp(res[0])
+# #     print "sss", g
+#     
+# #     res = opt.fmin_powell(calcA,x0=g,args=(M, c,
+# #                        beta, N),full_output=True,)
+#     
+# #    print "old" , F_k
+#     return F_k
+# 
+# 
 
 
 class Zhu1d(Pmf1d):
@@ -310,79 +302,28 @@ class Zhu1d(Pmf1d):
         
         #self._self_consistent_iterations()
         F_k=self.F_k.copy()
-        bconv = False
-        itr = 0
-        st = time.clock()
         self.hist = self.hist.astype(np.int64)
-        av_err = -1
-        while (bconv == False):
-            # #  p[i]= number of counts in bin[i]/(total count* exp(beta * Free_energy-bias_potential)
-            # # beta*exp(free_energy)=sum(exp(-beta*bias_pot)*prob)
-            #F_knew = self._update_fe(F_k)
-            if (itr >= self.maxiter):
-                logger.warn("Maximum iterations reached (%s). Bailing out" % self.maxiter)
-                break
-            else:
-                itr += self.chkdur
-             
             
-            F_knew = minimize1d_1(F_k, self.hist,self.U_b,
-                                self.beta, self.N_k, self.chkdur)
+        F_knew = minimize1d(F_k, self.hist,self.U_b,
+                                self.beta,self.g_k,self.N_k, self.chkdur, windowZero)
 
-            err_k = np.abs(F_knew - F_k)
-            av_err = np.average(err_k)
-            F_k = F_knew
-            logger.info("Iteration %s Average Error %s" % (itr, av_err))
-            logger.info("saving fe chkpoint")
-            np.savez(chkpointfile, F_k)
+        logger.info("saving fe chkpoint")
+        np.savez(chkpointfile, F_knew)
             
-            if (av_err < self.tol):
-                bconv = True
-        
-        logger.info("Error %s", av_err)
-        logger.debug("Iter: %d  Time taken sec: %s", itr, time.clock() - st)
-        self.F_k = F_k    
+        self.F_k = F_knew    
         self._compute_prob()
 
-    def _update_fe(self,F_k):
-        
-        F_knew = np.zeros_like(F_k)
-        for i in xrange(self.midp_bins.size):
-            num = self.hist[i]
-            U_b = self.U_b[i, :]
-            logbf = self.beta * (F_k - U_b) + np.log(self.N_k)
-            denom = self._compute_logsum(logbf)
-            if num == 0:
-                logbf = (-self.beta * U_b) 
-            else:
-                logbf = (-self.beta * U_b) + np.log(num) - denom
-                
-                 
-            F_knew += np.exp(logbf)
-            
-        F_knew = -1.*np.log(F_knew) / self.beta        
-        F_knew = F_knew - F_knew[0]
-        
-        return F_knew
-    
-    def _compute_logsum(self,numpyArray):
-        ''' return log of sum of exponent of array
-        '''
-        
-        ArrayMax = numpyArray.max()
-        
-        return np.log(np.exp(numpyArray - ArrayMax ).sum() ) + ArrayMax
         
         
     def _compute_prob(self):
         
-        F_k=self.F_k
+        F_k=np.copy(self.F_k)
         
         for i in xrange(self.midp_bins.size):
             num = self.hist[i]
             U_b = self.U_b[i, :]
-            logbf = self.beta * (F_k - U_b) + np.log(self.N_k)
-            denom = self._compute_logsum(logbf)
+            logbf = F_k - self.beta *U_b + np.log(self.N_k)
+            denom = compute_logsum(logbf)
             if num == 0:
                 self.prob[i] = 0
             else:
