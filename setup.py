@@ -41,7 +41,7 @@ scripts =  [e for e in glob('scripts/*.py') if not e.endswith('__.py')]
 
 
 
-setup(packages=["pmfcalculator","pmfcalculator.pmf1d","pmfcalculator.pmf2d","pmfcalculator.tools"],
+setup(packages=["pmfcalculator","pmfcalculator.pmf1d","pmfcalculator.pmf2d","pmfcalculator.tools","pmfcalculator.pmfNd"],
     package_dir = {'pmfcalculator':'src'},
     ext_package = "pmfcalculator",
     ext_modules = ext_modules,

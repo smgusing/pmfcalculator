@@ -22,6 +22,13 @@ class Bias2D(object):
     def compute_potential_2D(self,paramsX,paramsY,x,y):
         return
     
+class BiasND(object):
+
+    __metaclass__ = abc.ABCMeta
+    
+    @abc.abstractmethod
+    def compute_potential_ND(self,**args):
+        return
  
  
 class HarmonicBias(Bias1D):
@@ -50,14 +57,14 @@ class HarmonicBias(Bias1D):
 class CosineBias(Bias1D):
     
     def compute_potential_1D(self,params,x):
-       ''' cosine potential for angle
-       
-       '''
-
-       forceConst,xopt = params
-       U = forceConst * (1.0 - np.cos(np.radians(x - xopt)))
-       
-       return U
+        ''' cosine potential for angle
+        
+        '''
+        
+        forceConst,xopt = params
+        U = forceConst * (1.0 - np.cos(np.radians(x - xopt)))
+        
+        return U
     
 class Harmonic_cosine(Bias2D):
     ''' Both Harmonic and Cosine potentials

@@ -95,7 +95,19 @@ class Pmf2d(object):
         
     def make_2dhistogram(self, pos_kn=None, N_k=None, binrange=None):
         ''' Construct histogram
-        
+            nsim = 1
+    for i,j in enumerate(collvars):
+        UbDim.append()
+        nsim *= len(vardict[j])
+    
+    UbDim.append(nsim)
+    Ub = np.zeros(UbDim,dtype = np.float32)
+    vars = np.arange(len(collvars))
+    
+    for i,j in np.ndenumerate(Ub):
+        for k in zip(vars,i):
+            biasFunc[k[0]](histMidpoints[k])
+
         Parameters: pos_kn: list of arrays
                         consisting of observation of reaction coordinate
                     N_k: array

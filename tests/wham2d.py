@@ -2,140 +2,15 @@
 import numpy as np 
 import logging, sys, os
 import time
+
 import pmfcalculator
-import scipy
-import scipy.optimize as opt 
+from pmfcalculator import cwham,StatsUtils
 from pmf2d import Pmf2d
 np.seterr(all='raise',under='warn')
 logger = logging.getLogger(__name__)
 
 
-         
-
-def calcA(dG,nmidpx,nmidpy, hist, U_bij,
-                                beta, N_k):
-    S = N_k.size
-    dGcumPadded = np.zeros(S,dtype=np.float)
-    dGcumPadded[1:] = np.cumsum(dG)
-      
-    part1 = (N_k[1:]*dGcumPadded[1:]).sum() 
-            
-    
-    
-    part2 = 0
-    for ii in xrange(nmidpx):
-        for jj in xrange(nmidpy):
-             num = hist[ii, jj]
-             if num > 0:
-                 denom = N_k*np.exp(-beta*U_bij[ii,jj,:]) * np.exp(dGcumPadded)
-                 try:
-                     part2 += num * np.log(num/denom.sum())
-                 except FloatingPointError:
-                     pass
-                 
-    
-    A = -part1 -part2
-    print "A", A              
-    return A
-    
-def calcAder(dG,nmidpx,nmidpy, hist, U_bij,
-                                beta, N_k):
-    S = N_k.size
-    dGcumPadded = np.zeros(S,dtype=np.float)
-    dGcumPadded[1:] = np.cumsum(dG)
-    derv = np.zeros_like(dG)
-
-    for i in range(1,S):
-        N_k[1:] * dGcumPadded[1:]
-        part2 = 0   
-         
-        for ii in xrange(nmidpx):
-            for jj in xrange(nmidpy):
-                num = hist[ii, jj] * np.exp(-beta*U_bij[ii,jj,i]) 
-                if num > 0:
-                    denom = N_k*np.exp(-beta*U_bij[ii,jj,:]) * np.exp(dGcumPadded)
-                    try:
-                        part2 += num/denom.sum() - 1 
-                    except FloatingPointError:
-                        pass
-        
-        derv[i-1] = N_k[i]*np.exp(dGcumPadded[i])*part2 
-    
-    print "DERV",derv
-    
-    return derv
-    
-    
-    
-    
-# def error_func(F_k,nmidpx,nmidpy, hist, U_bij,
-#                                 beta, N_k):
-#     A = calcA(F_k,nmidpx,nmidpy, hist, U_bij,
-#                                 beta, N_k)
-#     
-#     err_k = np.abs(F_knew - F_k)
-#     av_err = np.average(err_k)
-#     print "Err",av_err
-#     print F_knew -F_k
-#     print 
-#     return av_err
-
-    
-def minimize2d(F_k,nmidpx,nmidpy, hist, U_bij,
-                                beta, N_k,g_k,chkdur):
-    
-    
-    # convert fe to dG
-    dG = np.zeros(F_k.size - 1, dtype = np.float)
-    for i in range(dG.size):
-        try:
-            dG[i] = F_k[i+1]/ F_k[i]
-            dG[i] = np.log(dG[i])
-        except FloatingPointError:
-            dG[i] = 0
-   
-   
-   
-   
-#                                 beta, N_k)
-#     for i in range(20):
-#         print "self cons", i
-#         F_knew = iterate_Fe(F_k,nmidpx,nmidpy, hist, U_bij,beta, N_k)
-#         err_k = np.abs(F_knew - F_k)
-#         av_err = np.average(err_k)
-#         print "Err",av_err
-#         F_k = F_knew
-                         
-    res=opt.minimize(calcA,x0=dG,args=(nmidpx,nmidpy, hist, U_bij,
-                                beta, N_k),method='BFGS',jac=calcAder)
-    
-    #res=opt.fmin_cg(error_func,x0=F_k,args=(nmidpx,nmidpy, hist, U_bij,
-    #                            beta, N_k),epsilon=2)
-    #res=opt.fmin_cg(error_func,x0=F_k,args=(nmidpx,nmidpy, hist, U_bij,
-    #                            beta, N_k),fprime=iterate_Fe_der)
-    #F_knew = iterate_Fe(F_k,nmidpx,nmidpy, hist, U_bij,
-    #                            beta, N_k)
-    
-    #print "NEW",F_knew
-    
-    dG = res.x0
-    
-    
-    # convert dG to Fe
-    F_knew = np.zeros_like(F_k)
-    F_knew[:-1] = np.cumsum(dG)
-    F_knew[:-1] = np.exp(F_knew[:-1])
-    F_knew = F_knew- F_knew[0]
-     
-    
-    
-    
-    return F_knew
-    
-
-
-
-class Zhu2d(Pmf2d):
+class Wham2d(Pmf2d):
     ''' Class to compute 2d wham
     
     Parameters: bias: object of class derived from Bias class
@@ -160,23 +35,31 @@ class Zhu2d(Pmf2d):
                   temperature=300, x0=None, y0=None,fcx=None,
                   fcy=None,g_k=None,chkdur=None):
         
-        super(Hummer2d,self).__init__(bias, maxiter, tol, nbins,
-                  temperature, x0, y0,fcx,
-                  fcy,g_k,chkdur)
+        super(Wham2d,self).__init__(bias, x0, y0,fcx, fcy,maxiter, tol, nbins,
+                  temperature, g_k,chkdur)
         
         logger.info("Wham2d successfully initialized")
 
         
       
     def estimateFreeEnergy(self,F_k = None, histogramfile = None, 
-                                  fefile = None,g_k = None, chkpointfile = ".fe.npz") :
-        '''Compute 2D pmf using the given project and input arguments'''
-        
-        #nxbins =self.nbins[0]
-        #nybins = self.nbins[1]
+                                  fefile = None,g_k = None, chkpointfile = ".fe.npz",
+                                  setToZero=None) :
+        '''Compute 2D pmf using the given project and input arguments
+            Parameters:
+                F_k: Array
+                    Initial guess of free energies
+                histogramfile: npz file
+                fefile: npz file
+                g_k: Array
+                chkpointfile: npzfile
+                setToZero: list 
+                    reaction coordinate value where fe should be shifted to zero
+        '''
+       
         beta = self.beta
         if os.path.isfile(histogramfile):
-            self.hist, self.midp_xbins, self.midp_ybins, self.N_k = self.load_histogram(histogramfile)
+            self.hist, self.midp_xbins, self.midp_ybins, self.N_k, xedges, yedges = self.load_histogram(histogramfile)
         
         elif self.hist is None:
             logger.debug("histogram not initialized") 
@@ -203,9 +86,14 @@ class Zhu2d(Pmf2d):
         
         if g_k is None:
             g_k = self.g_k
+            
+            
+        if setToZero is not None:
+            # Get umbrella number that correspond to given reaction coordinate
+            windowZero = self.getWindow(setToZero)
+        else:
+            windowZero = 0   
         
-        bconv = False
-        itr = 0
         self.U_bij=np.zeros((nmidpx,nmidpy,self.K),dtype=np.float64)
         for i in xrange(nmidpx):
             for j in xrange(nmidpy):
@@ -223,6 +111,8 @@ class Zhu2d(Pmf2d):
         prob = np.zeros([nmidpx,nmidpy],np.float64)
         st = time.clock()
         av_err = -1
+        bconv = False
+        itr = 0
         while (bconv == False):
             if (itr >= self.maxiter):
                 logger.warn("Maximum iterations reached (%s). Bailing out" % self.maxiter)
@@ -230,9 +120,9 @@ class Zhu2d(Pmf2d):
             else:
                 itr += self.chkdur
             
-            F_knew = minimize2d(F_k,nmidpx,nmidpy,
+            F_knew = cwham.minimize2d(F_k,nmidpx,nmidpy,
                                 self.hist,self.U_bij,
-                                self.beta, self.N_k,g_k,self.chkdur)
+                                self.beta, self.N_k,g_k,self.chkdur,windowZero)
             
             err_k = np.abs(F_knew - F_k)
             av_err = np.average(err_k)
@@ -249,6 +139,7 @@ class Zhu2d(Pmf2d):
         self.F_k = F_k    
         self._compute_prob()
         
+        
 
     def _compute_prob(self):
         ''' compute probabilites once final F_k are known
@@ -262,7 +153,7 @@ class Zhu2d(Pmf2d):
                  U_b = self.U_bij[i, j, :]
                  logbf = self.beta * (F_k - U_b) + np.log(self.N_k)
                  #logbf[notzero] = self.beta * (F_k[notzero] - U_b[notzero]) + np.log(self.N_k[notzero])
-                 denom = self._compute_logsum(logbf)
+                 denom = StatsUtils.compute_logsum(logbf)
                  if num == 0:
                      self.prob[i,j] = np.NAN
                  else:    
@@ -270,12 +161,47 @@ class Zhu2d(Pmf2d):
         
         
         
-    def _compute_logsum(self,numpyArray):
-        ''' return log of sum of exponent of array
+    
+    def calcFrameWeight(self,x,y):
+        ''' compute unnormalized weight of an individual frame
         '''
         
-        ArrayMax = numpyArray.max()
-        return np.log(np.exp(numpyArray - ArrayMax ).sum() ) + ArrayMax
-    
+        U_b = self.bias.compute_potential_2D( paramsX=(self.fcxy[:,0], self.xyopt[:,0]),
+                                              paramsY=(self.fcxy[:,1], self.xyopt[:,1]),
+                                              x=x, y=y )
+        logbf = self.beta * (self.F_k - U_b) + np.log(self.N_k)
+        denom = StatsUtils.compute_logsum(logbf)
+        try:
+            w = 1./np.exp(denom)
+        except ZeroDivisionError:
+            logger.critical("weight w is infinite! ... I will quit")
+            raise SystemExit
         
+        return w
+        
+    def getWindow(self,rcoords):
+        ''' get state number from reaction coordinate values
+        
+        Parameters: 
+            rcoords: list with two elements
+        
+        Returns:
+            state: integer
             
+        '''
+        
+        rcx,rcy = rcoords
+        sindexx = np.digitize([rcx], self.x0) 
+        sindexy = np.digitize([rcy], self.y0)
+        
+        umbNo = sindexx * self.y0.size + sindexy
+        
+        logger.info("state with x0,y0: %s,%s will be set to zero",self.xyopt[umbNo,0],self.xyopt[umbNo,1])
+        
+        return umbNo
+        
+         
+        
+        
+        
+        

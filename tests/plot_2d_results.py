@@ -5,12 +5,11 @@ import os, sys, glob, math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import txtreader, setplotformat
+import txtreader
 #import pmfcalculator
 from pmfcalculator import Reader2d
 
 ##############################################
-setplotformat.doublecol()
 
 def plot_1dpmf(pmf1dfiles, shiftx=3.8):
     ''' plot 1d pmf profiles from files
@@ -382,7 +381,7 @@ def main():
     fe2davfile = "fe2dav.npz"
     #plot_multiples(histfiles,probfiles,pmf1dfiles,pmf2dfiles)
     plot_2dpmf("refpmf2d.npz")
-    plot_2dpmf("pmf2d.npz")
+    #plot_2dpmf("pmf2d.npz")
     #plot_2dhist("results/hist2d.npz")
     #calc2dpmf(pmf2dfiles, shiftx=3.5, shifty=90.0)
     #plot_ineff(ineff_file,prjfile)

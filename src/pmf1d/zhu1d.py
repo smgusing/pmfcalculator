@@ -299,7 +299,6 @@ class Zhu1d(Pmf1d):
                 self.U_b[i,:] = self.bias.compute_potential_1D(params=(self.fcx,self.xopt),x=self.midp_bins[i])
                 
         logger.debug("Biasing potentials stored")
-        
         #self._self_consistent_iterations()
         F_k=self.F_k.copy()
         self.hist = self.hist.astype(np.int64)
