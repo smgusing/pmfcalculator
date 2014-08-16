@@ -1,8 +1,6 @@
 #! /usr/bin/env python
 import numpy as np 
 import logging,sys,os,time
-import scipy
-import scipy.optimize as opt 
 
 import pmfcalculator
 from pmfcalculator import cwham
@@ -11,6 +9,16 @@ from pmf1d import Pmf1d
 np.seterr(all='raise',under='warn')
 
 logger = logging.getLogger(__name__)
+
+# select minimizer
+try:
+    import scipy.optimize as opt 
+    globalVar_useScipy = True
+    logger.info("Using scipy.optimize for minimization.")
+except ImportError:
+    from naiveMinimizer import naiveMinimize
+    globalVar_useScipy = False
+    logger.info("Could not import scipy.optimize; falling back to a naive minimization implementation.")
 
 def compute_logsum(numpyArray):
     ''' return log of sum of exponent of array
@@ -70,7 +78,7 @@ def calcAder(g,M, log_c, beta, N):
     return derv
         
 
-def minimize1d(F_k, M, U_b, beta, g_k, N, chkdur, windowZero):
+def minimize1d(F_k, M, U_b, beta, g_k, N, chkdur, windowZero, tolerance):
     ''' use equation 18, 19, 20 
     
     Parameters
@@ -98,9 +106,15 @@ def minimize1d(F_k, M, U_b, beta, g_k, N, chkdur, windowZero):
     
     log_c = -beta*U_b
 
-    res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(M, log_c,
-                        beta, N),factr =10, bounds = bounds)
-    F_k = res[0]
+    # select minimizer
+    if globalVar_useScipy == True:
+        res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(M, log_c,
+                            beta, N),factr =10, bounds = bounds)
+        F_k = res[0]
+    else:
+        calcA_partial    = lambda g:    calcA(g, M, log_c, beta, N)
+        calcAder_partial = lambda g: calcAder(g, M, log_c, beta, N)
+        F_k = naiveMinimize(calcA_partial, calcAder_partial, g, tolerance)
     
     return F_k
 
@@ -304,7 +318,7 @@ class Zhu1d(Pmf1d):
         self.hist = self.hist.astype(np.int64)
             
         F_knew = minimize1d(F_k, self.hist,self.U_b,
-                                self.beta,self.g_k,self.N_k, self.chkdur, windowZero)
+                                self.beta,self.g_k,self.N_k, self.chkdur, windowZero, self.tol)
 
         logger.info("saving fe chkpoint")
         np.savez(chkpointfile, F_knew)
