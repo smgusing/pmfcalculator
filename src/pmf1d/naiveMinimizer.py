@@ -5,7 +5,7 @@ It would be nice if there was a way to restrict the domain to a subset of R^n.
 
 import numpy as np
 
-# :: Num a, b => (Vector a -> b) -> (Vector a -> b) -> Vector a -> Vector a
+# :: Num a, b => (Vector a -> b) -> (Vector a -> Vector b) -> Vector a -> Vector a # out of date
 # (differentiable) functions from R^n to R
 def naiveMinimize(f, df, x0, precision):
     step = findLargestStep(f, df, x0)

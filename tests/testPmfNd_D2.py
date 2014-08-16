@@ -318,7 +318,7 @@ class testpmfNd_D2():
         ax.set_ylabel("Distance (nm)")
         cbar.set_label("PMF (kJ/mol)")
         plt.savefig(pmf2dfile.replace(".npz", ".png"))
-        
+        createTestData
         
     def genpmf(self):
         prj = ReaderNd(self.yamlfile)

@@ -153,7 +153,7 @@ def minimize1d(F_k, M, U_b, beta, g_k, N, chkdur, windowZero, tolerance):
 # def calcA_dg_der(dg,M, c, beta, N):
 #     ''' use equation 20
 #     '''
-# 
+# minimizeNd
 #     nbins = M.size
 #     nsims = N.size
 # 
