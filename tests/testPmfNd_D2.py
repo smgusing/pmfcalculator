@@ -3,8 +3,8 @@
 import numpy as np
 import numpy.random as rand
 
-import unittest
-import os,logging
+#import unittest
+import os,logging,shutil,glob
 
 from multiprocessing import Pool
 #import pmfcalculator
@@ -212,15 +212,15 @@ def createTestData(pool):
     ny0=45
     #nx0=40 # number of points along rc where samples will be generated
     #ny0=20
-    fcx0=100  # force constant for harmonic potential
-    fcy0=100
+    fcx0=400  # force constant for harmonic potential
+    fcy0=400
     
     datadir = "2D"
     
     if not os.path.isdir(datadir):
         os.mkdir(datadir)
     
-    yamlfile = "dummy.yaml"
+    yamlfile = "dummy.yaml"'y'
     refpmf_file="refpmf2d.npz"
 
     x=np.linspace(rc1_beg,rc1_end,npts1)
@@ -284,6 +284,42 @@ class testpmfNd_D2():
             
         self.yamlfile = "dummy.yaml"
         
+        
+    def plotpmf(self,pmf2dfile):
+        '''plot 2d pmf from files
+        
+        '''
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+        a = np.load(pmf2dfile)
+        x,y = a['arr_0']
+        midx = (x[1:] + x[:-1]) * 0.5
+        midy = (y[1:] + y[:-1]) * 0.5
+        #y = a['arr_1']
+        X, Y = np.meshgrid(midy, midx)
+        Z = a['arr_1']
+        print x.shape,y.shape,X.shape,Y.shape,Z.shape
+        mask = np.isnan(Z)
+        Z = np.ma.masked_array(data=Z, mask=mask)
+        
+        # cmap=mpl.cm.gist_earth
+        cmap = mpl.cm.jet
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        levels = np.linspace(0, Z.max(), 100)
+        # levels=np.linspace(17,28,100)
+        p1 = ax.contourf(X, Y, Z, cmap=cmap, levels=levels)
+        # p1=ax.pcolor(X,Y,Z,cmap=cmap)
+        cbar = plt.colorbar(p1, ax=ax, format="%4.1f")
+    
+        ax.axis([0, 180, 0, 8])
+        ax.grid()
+        ax.set_xlabel("Angle (Degrees)")
+        ax.set_ylabel("Distance (nm)")
+        cbar.set_label("PMF (kJ/mol)")
+        plt.savefig(pmf2dfile.replace(".npz", ".png"))
+        
+        
     def genpmf(self):
         prj = ReaderNd(self.yamlfile)
         obsFN="observ.npz"
@@ -295,7 +331,7 @@ class testpmfNd_D2():
             print("loading %s"%obsFN)
             observ = np.load(obsFN)['arr_0']
             
-        number_bins = [40, 20] 
+        number_bins = [21, 21] 
         temperature = 300
         cv_ranges = [(2.0, 6.0),( 40.0, 180.0)] 
         setZero = [6.0,90.0] 
@@ -311,14 +347,24 @@ class testpmfNd_D2():
             calc.load_histogram(histFN)
         
         Ub = bpot.biasPotential(prj.biasType,prj.collvars,prj.vardict,calc.histEdges)
-        calc.estimateFreeEnergy(Ub,histogramfile=histFN,setToZero=None)
+        calc.estimateFreeEnergy(Ub,histogramfile=histFN,setToZero=14)
         calc.write_FreeEnergies("feNd.npz")
+
+        calc.divideProbwithSine(dim=1)
+        
         calc.write_probabilities("probNd.npz")
         calc.probtopmf()
         calc.write_pmf("pmfNd.npz")
-        self.plotpmf("pmfNd.npz")
 
+    def clean(self):
+        testdir = "2D"
+        print "cleaning ..."
+        rmfiles = ['dummy.yaml'] + glob.glob("*.npz")
+        if os.path.isdir(testdir):
+            shutil.rmtree(testdir)
         
+        for file in rmfiles:
+            os.remove(file)
          
 
 
@@ -327,4 +373,6 @@ if __name__ == "__main__":
     pool=Pool(processes=12)
     test = testpmfNd_D2(pool)
     test.genpmf()
+    #test.plotpmf("pmfNd.npz")
+    #test.clean()
     

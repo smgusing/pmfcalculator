@@ -83,8 +83,8 @@ function test_2d_wham {
     cd test2d
     
     calc2dpmf.py -projfile dummy.yaml -maxiter 1000  \
-    -nbins 100 45 -tolerance 1e-3 -chkdur 50 -temperature 298.15 \
-    -range -0.0 7.95 0.0 180.0 -nbootstrap 1 -bootbegin 0 -zerofe 7.5 90.0 -l debug 
+    -nbins 20 25 -tolerance 1e-3 -chkdur 50 -temperature 300 \
+    -range 2.0 6.0 40.0 180.0 -nbootstrap 0 -bootbegin 0 -zerofe 4.0 90.0 -l debug 
 
     if  [[ -f  "pmf2d1.npz" ]]
     then

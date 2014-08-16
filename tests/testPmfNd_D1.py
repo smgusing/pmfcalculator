@@ -3,8 +3,8 @@
 import numpy as np
 import numpy.random as rand
 
-import unittest
-import os,logging
+#import unittest
+import os,logging,sys,shutil,glob
 
 import pmfcalculator
 import smooth as sm
@@ -13,6 +13,7 @@ from pmfcalculator.pmfNd import ZhuNd
 import pmfcalculator.potentials as bpot
 
 logger = logging.getLogger("pmfcalculator")
+
 #logger.setLevel("DEBUG")
 
 
@@ -229,9 +230,9 @@ def createTestData():
 
 
 
-class testpmfNd_D1(unittest.TestCase):
+class testpmfNd_D1():
     
-    def setUp(self):
+    def __init__(self):
         print "\n Creating Test Data \n"
         if not os.path.isdir("1D"): 
             createTestData()
@@ -294,8 +295,20 @@ class testpmfNd_D1(unittest.TestCase):
         plt.plot(b[:,0],b[:,1])
         plt.show()
         #print edges,pmf
+
+    def clean(self):
+        testdir = "1D"
+        print "cleaning ..."
+        rmfiles = ['dummy.yaml'] + glob.glob("*.npz")
+        if os.path.isdir(testdir):
+            shutil.rmtree(testdir)
+        
+        for file in rmfiles:
+            os.remove(file)
         
         
         
 if __name__ == "__main__":
-    unittest.main()        
+    test = testpmfNd_D1()
+    test.genpmf()
+    test.clean()        

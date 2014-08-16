@@ -8,7 +8,7 @@ import scipy.optimize as opt
 #import pmfcalculator
 from pmfcalculator import StatsUtils
 from pmfNd import PmfNd
-np.seterr(all='raise',under='warn')
+np.seterr(all='raise',under='warn',over='warn')
 logger = logging.getLogger(__name__)
 
 def compute_logsum(numpyArray):
@@ -63,18 +63,19 @@ def calcAder(g,M, log_c, beta, N):
     p = np.zeros(M.shape)
     
     for i,j in np.ndenumerate(p):
-        denom = np.exp(compute_logsum( np.log(N) + g + log_c[i,:] ) ) 
         try:
+            denom = np.exp(compute_logsum( np.log(N) + g + log_c[i,:] ) ) 
             p[i] = M[i]/ denom 
         
-        except:
+        except FloatingPointError:
             p[i] = 0.
+            
         
         
     derv = np.zeros(nsims)
     
     for i in range(nsims):
-        derv[i] = N[i] * (np.exp(g[i]) *  (p * np.exp(log_c[:,i]) ).sum() - 1.)
+        derv[i] = N[i] * (np.exp(g[i]) *  (p * np.exp(log_c[...,i]) ).sum() - 1.)
         
     #print "DER", derv    
     return derv
@@ -105,11 +106,12 @@ def minimizeNd(F_k, M, U_b, beta, g_k, N, windowZero):
     
     g = np.copy(F_k)
     bounds = [(None,None) for i in range(g.size)]
+    #bounds = [(-100,100) for i in range(g.size)]
     bounds[windowZero] = (0,0)
     
     log_c = -beta*U_b
     res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(M, log_c,
-                        beta, N),factr =10, bounds = bounds)
+                        beta, N),factr =10, disp=1, bounds = bounds)
     F_k = res[0]
     
     return F_k

@@ -100,9 +100,15 @@ def main(args):
     
 
     # Read Data
-    logger.info("Reading files ...")    
-    pos_xkn,pos_ykn,N_k = prj.read_xvgfiles()
-    logger.info("files read.")
+    dataFN="observ.npz"
+    if not os.path.isfile(dataFN):
+        logger.info("Reading xvgfiles ...")    
+        pos_xkn,pos_ykn,N_k = prj.read_xvgfiles()
+        logger.info("files read.")
+        np.savez(dataFN,pos_xkn,pos_ykn,N_k)
+    else:
+        a=np.load(dataFN)
+        pos_xkn,pos_ykn,N_k = a['arr_0'],a['arr_1'],a['arr_2']
     
     ### Compute pmf with stat inefficiencies
     if not os.path.isfile(args.inefffile):
@@ -146,8 +152,11 @@ def main(args):
     else:
         logger.info("Subsampling without averaging")
 
-    pos_xkn,pos_ykn,N_k = utils.subsample2D(pos_xkn,pos_ykn,N_k,ineff)
-    g_k = np.zeros_like(ineff) + 1.0
+    if args.nbootstrap > 0:
+        pos_xkn,pos_ykn,N_k = utils.subsample2D(pos_xkn,pos_ykn,N_k,ineff)
+        g_k = np.zeros_like(ineff) + 1.0
+    else:
+        pass
         
     for i in range(args.bootbegin,args.nbootstrap):
         logger.info(" Bootstrap iteration: %d ",i+1)

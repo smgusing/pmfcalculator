@@ -381,7 +381,8 @@ def main():
     fe2davfile = "fe2dav.npz"
     #plot_multiples(histfiles,probfiles,pmf1dfiles,pmf2dfiles)
     plot_2dpmf("refpmf2d.npz")
-    #plot_2dpmf("pmf2d.npz")
+    #plot_2dpmf("pmfNd.npz")
+    plot_2dpmf("pmf2d.npz")
     #plot_2dhist("results/hist2d.npz")
     #calc2dpmf(pmf2dfiles, shiftx=3.5, shifty=90.0)
     #plot_ineff(ineff_file,prjfile)

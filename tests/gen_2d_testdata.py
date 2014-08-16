@@ -187,19 +187,19 @@ def main1():
   
     T=300.0 # temperature in kelvin
     RT=8.3144621*T/1000.
-    rc1_beg=0
-    rc1_end=8
+    rc1_beg=2
+    rc1_end=6
     npts1=80
-    rc2_beg=0
+    rc2_beg=40
     rc2_end=180
     npts2=45
     
-    nx0=80 # number of points along rc where samples will be generated
+    nx0=40 # number of points along rc where samples will be generated
     ny0=45
     #nx0=40 # number of points along rc where samples will be generated
     #ny0=20
-    fcx0=100  # force constant for harmonic potential
-    fcy0=100
+    fcx0=400  # force constant for harmonic potential
+    fcy0=400
     pool=Pool(processes=12)
     
     datadir = "2D"
