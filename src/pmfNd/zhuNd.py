@@ -2,7 +2,6 @@
 import numpy as np 
 import logging, sys, os
 #import scipy
-import scipy.optimize as opt 
 
 
 #import pmfcalculator
@@ -10,6 +9,17 @@ from pmfcalculator import StatsUtils
 from pmfNd import PmfNd
 np.seterr(all='raise',under='warn',over='warn')
 logger = logging.getLogger(__name__)
+
+# select minimizer
+try:
+    import scipy.optimize as opt 
+    globalVar_useScipy = True
+    logger.info("Using scipy.optimize for minimization.")
+except ImportError:
+    from naiveMinimizer import naiveMinimize
+    globalVar_useScipy = False
+    logger.info("Could not import scipy.optimize; falling back to a naive minimization implementation.")
+
 
 def compute_logsum(numpyArray):
     ''' return log of sum of exponent of array
@@ -110,9 +120,17 @@ def minimizeNd(F_k, M, U_b, beta, g_k, N, windowZero):
     bounds[windowZero] = (0,0)
     
     log_c = -beta*U_b
-    res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(M, log_c,
-                        beta, N),factr =10, disp=1, bounds = bounds)
-    F_k = res[0]
+    # select minimizer
+    if globalVar_useScipy == True:
+        res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(M, log_c,
+                            beta, N),factr=10, disp=1, bounds = bounds)
+        F_k = res[0]
+    else:
+        calcA_partial    = lambda g:    calcA(g, M, log_c, beta, N)
+        calcAder_partial = lambda g: calcAder(g, M, log_c, beta, N)
+        arbitraryTolerance = 1e-7 # No parameter for tolerance exists in the PmfNd class.
+                                  # Requiring a tolerance as input is a weakness of naiveMinimizer.
+        F_k = naiveMinimize(calcA_partial, calcAder_partial, g, arbitraryTolerance)
     
     return F_k
 
