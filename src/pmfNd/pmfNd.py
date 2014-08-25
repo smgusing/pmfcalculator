@@ -73,7 +73,7 @@ class PmfNd(object):
             
         # create mask for data outside the range in ANY dimension
         nsamples,ncv = cv.shape
-        cv_mask = np.zeros(cv.shape, dtype=np.bool)
+        cv_mask = np.zeros(cv.shape[0], dtype=np.bool)
         idx =  np.ones(nsamples,dtype=np.bool)
 
         for i in range(ncv):
@@ -85,13 +85,13 @@ class PmfNd(object):
             logger.error("No samples considered. Check your ranges \n ")
             raise SystemExit("Exiting .. Sorry!")
         else:
-            cv_mask[idx,:] = True
+            cv_mask[idx] = True
                                 
         # determine number of samples considered from each simulation
         observCum = np.insert(np.cumsum(num_observ),0,0)
         num_observ1=[]
         for beg,end in zip(observCum[:-1],observCum[1:]):
-            num_observ1.append( np.count_nonzero(cv_mask[beg:end,0]) )
+            num_observ1.append( np.count_nonzero(cv_mask[beg:end]) )
         num_observ1 = np.array(num_observ1,dtype=np.int)
         logger.debug("Number of samples considered from each simulations %s",num_observ1)
         logger.debug("total number of simulations %s",num_observ.size)
@@ -110,7 +110,7 @@ class PmfNd(object):
 
         
         
-        histNd,edges = np.histogramdd(cv,bins=hist_ranges)
+        histNd,edges = np.histogramdd(cv[cv_mask],bins=hist_ranges)
         
         checkhist = np.where(histNd < sys.float_info.epsilon)
         if checkhist[0].size > 0:

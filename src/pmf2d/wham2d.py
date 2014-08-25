@@ -102,7 +102,6 @@ class Wham2d(Pmf2d):
                                                                       paramsY=(self.fcxy[:,1], self.xyopt[:,1]),
                                                                       x=self.midp_xbins[i],
                                                                       y=self.midp_ybins[j] )
-                
         logger.debug("Biasing potentials stored")
         
         #self._self_consistent_iterations()
@@ -124,7 +123,7 @@ class Wham2d(Pmf2d):
                                 self.hist,self.U_bij,
                                 self.beta, self.N_k,g_k,self.chkdur,windowZero)
             
-            err_k = np.abs(F_knew - F_k)
+            err_k = np.abs(np.exp(F_knew) - np.exp(F_k))
             av_err = np.average(err_k)
             F_k = F_knew
             

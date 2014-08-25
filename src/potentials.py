@@ -81,9 +81,8 @@ def biasPotential(biasType,collvars,vardict,histEdges):
     
     varZipped = [zip(vardict[i+'_fc'],vardict[i + '_x0']) for i in collvars]
         
-    # for every point evaluate function with these paramaters    
+    # for every point evaluate function with these paramaters
     fargs = list(itertools.product(*varZipped))
-    
     #Dimensions of Ub is dimension of histogram + 1
     # size of each dimenstion is number of gridpoints in that dimension
     # the last dimension is total number of simulations

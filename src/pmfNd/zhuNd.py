@@ -31,6 +31,69 @@ def compute_logsum(numpyArray):
     return np.log(np.exp(numpyArray - ArrayMax ).sum() ) + ArrayMax
 
 
+
+def calcP(M,N,f,c):
+     
+    p = np.zeros(M.shape)
+     
+    for i,j in np.ndenumerate(p):
+        denom = (N * f * c[i]).sum()
+ 
+        if denom > np.finfo(float).eps:
+            p[i] = M[i]/ denom 
+        else:
+            p[i] = np.inf
+ 
+    return p
+
+def calcF(p,c):
+    
+    nsim = c.shape[-1]
+    f = np.zeros(nsim)
+    
+    for i in range(nsim):
+        denom = (p * c[...,i]).sum()
+        if denom > np.finfo(float).eps:
+            f[i] = 1./ denom
+        else:
+            f[i] = np.inf
+    
+    return f
+        
+
+
+
+# def calcP(M,N,f,c):
+#      
+#     p = np.zeros(M.shape)
+#      
+#     for i in range(M.shape[0]):
+#         for j in range(M.shape[1]):
+#             denom = (N * f * c[i,j,:]).sum()
+#  
+#             if denom > np.finfo(float).eps:
+#                 p[i,j] = M[i,j]/ denom 
+#             else:
+#                 p[i] = np.inf
+#  
+#     return p
+#  
+# def calcF(p,c):
+#      
+#     nsim = c.shape[-1]
+#     f = np.zeros(nsim)
+#     denom = np.zeros(nsim) 
+#     for i in range(p.shape[0]):
+#         for j in range(p.shape[1]):
+#             denom =  denom + p[i,j] * c[i,j,:]
+#      
+#     f = 1./denom    
+#     return f
+        
+
+
+
+
 def calcA(g, M, log_c, beta, N):
     ''' use equation 19 
     
@@ -52,7 +115,7 @@ def calcA(g, M, log_c, beta, N):
     part2 = 0.0
     for i,j in np.ndenumerate(M):
         if M[i] > 0:
-            denom =  compute_logsum( logN + log_c[i, :] + g ) 
+            denom =  compute_logsum( logN + log_c[i] + g ) 
             part2 = part2 + ( M[i] * (np.log(M[i]) - denom ) ) 
         else:
             pass
@@ -60,7 +123,7 @@ def calcA(g, M, log_c, beta, N):
      
     A = (-(N * g).sum() ) - part2
     
-    print "A", A 
+    #print "A", A 
     
     return A
      
@@ -74,13 +137,12 @@ def calcAder(g,M, log_c, beta, N):
     
     for i,j in np.ndenumerate(p):
         try:
-            denom = np.exp(compute_logsum( np.log(N) + g + log_c[i,:] ) ) 
+            denom = np.exp(compute_logsum( np.log(N) + g + log_c[i] ) ) 
             p[i] = M[i]/ denom 
         
         except FloatingPointError:
             p[i] = 0.
             
-        
         
     derv = np.zeros(nsims)
     
@@ -90,7 +152,26 @@ def calcAder(g,M, log_c, beta, N):
     #print "DER", derv    
     return derv
 
-
+def selfConsistentIterations(f, M, c, beta, N, tolerance):
+    avg_err = 1.0
+    max_steps = 10000
+    step = 0
+    f = f - f.min()
+    feconst = 1.0
+    zerof = np.where(f==0)
+    f[zerof] = feconst
+    print f  
+    while (avg_err > tolerance) and ( step < max_steps):
+        p =  calcP(M,N,f,c)
+        
+        new_f = calcF(p,c)
+        new_f = new_f - new_f.min() + feconst # Avoid all zero solution
+        avg_err=np.sum(np.abs(new_f - f))
+        f = new_f
+        step += 1
+        logger.info("Step %s : Sum change %s",step,avg_err)
+    return np.log(new_f)
+    
 
 
 def minimizeNd(F_k, M, U_b, beta, g_k, N, windowZero):
@@ -114,23 +195,29 @@ def minimizeNd(F_k, M, U_b, beta, g_k, N, windowZero):
     
     '''
     
-    g = np.copy(F_k)
+    g = np.copy(F_k) 
     bounds = [(None,None) for i in range(g.size)]
     #bounds = [(-100,100) for i in range(g.size)]
     bounds[windowZero] = (0,0)
-    
     log_c = -beta*U_b
-    # select minimizer
-    if globalVar_useScipy == True:
-        res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(M, log_c,
-                            beta, N),factr=10, disp=1, bounds = bounds)
-        F_k = res[0]
+    tolerance = 1e-8
+    method = "selfAconsistent"
+    
+    if method == "selfconsistent":
+        F_k = selfConsistentIterations(g, M, np.exp(log_c), beta, N, tolerance)
+        
     else:
-        calcA_partial    = lambda g:    calcA(g, M, log_c, beta, N)
-        calcAder_partial = lambda g: calcAder(g, M, log_c, beta, N)
-        arbitraryTolerance = 1e-7 # No parameter for tolerance exists in the PmfNd class.
-                                  # Requiring a tolerance as input is a weakness of naiveMinimizer.
-        F_k = naiveMinimize(calcA_partial, calcAder_partial, g, arbitraryTolerance)
+        # select minimizer
+        if globalVar_useScipy == True:
+            res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(M, log_c,
+                                beta, N),factr=1, disp=10, bounds = bounds)
+            F_k = res[0]
+        else:
+            calcA_partial    = lambda g:    calcA(g, M, log_c, beta, N)
+            calcAder_partial = lambda g: calcAder(g, M, log_c, beta, N)
+            arbitraryTolerance = 1e-7 # No parameter for tolerance exists in the PmfNd class.
+                                      # Requiring a tolerance as input is a weakness of naiveMinimizer.
+            F_k = naiveMinimize(calcA_partial, calcAder_partial, g, arbitraryTolerance)
     
     return F_k
 
