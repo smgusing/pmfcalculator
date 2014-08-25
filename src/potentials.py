@@ -38,10 +38,12 @@ def _biasPotential(fs, argLists, edgeLists):
     """
     simulationParameters = list(itertools.product(*argLists))
     simulationPotentials = map(lambda p: _combinePotentials(fs, p), simulationParameters)
-    binCoordinates = list(itertools.product(*map(_binCenters, edgeLists)))
-    return np.reshape((len(simulationPotentials), len(binCoordinates))
-                      , np.array([ f(p) for f in simulationPotentials for p in binCoordinates ])
-                      )
+    binCenters = map(_binCenters, edgeLists)
+    binDimensions = map(len, binCenters)
+    binCoordinates = list(itertools.product(*binCenters))
+    return np.reshape( np.array([ f(p) for p in binCoordinates for f in simulationPotentials ])
+                     , binDimensions + [len(simulationPotentials)]
+                     )
 
 # :: [(Arg -> Double -> Double)] -> [Arg] -> (Vector Double -> Double)
 def _combinePotentials(fs, argTuples):
