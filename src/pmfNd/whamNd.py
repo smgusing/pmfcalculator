@@ -41,7 +41,7 @@ class WhamNd(PmfNd):
         
         self.prob = self.unbiasedProb(f, c)
             
-        return f
+        self.f = f
 
     def unbiasedProb(self,f,c):
         ''' use wham equations, equation 15

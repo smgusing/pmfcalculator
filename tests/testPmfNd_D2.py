@@ -361,7 +361,8 @@ class testpmfNd_D2():
             calcZhu.load_histogram(zhuhistFN)
             
         Ub = bpot.biasPotential(prj.biasType,prj.collvars,prj.vardict,calcZhu.histEdges)
-        calcZhu.estimateFreeEnergy(Ub,histogramfile=zhuhistFN)
+        calcZhu.setParams(Ub,histogramfile=zhuhistFN)
+        calcZhu.estimateWeights()
         calcZhu.divideProbwithSine(dim=1)
         calcZhu.probtopmf()
         calcZhu.write_pmf("pmf2d.npz")

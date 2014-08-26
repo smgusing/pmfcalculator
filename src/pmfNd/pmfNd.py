@@ -3,7 +3,7 @@ import abc
 import numpy as np 
 import logging, sys, os
 import time
-from pmfcalculator import minimize
+
 
 
 np.seterr(all='raise',under='warn')
@@ -41,6 +41,12 @@ class PmfNd(object):
             self.beta = 1.0 / (R * temperature)  # inverse temperature of simulations (in 1/(kJ/mol))
         
         logger.info("PmfNd successfully initialized")
+        
+    @abc.abstractmethod
+    def estimateWeights(self,**args):
+        '''Abstract method for estimating weights'''
+        return
+        
         
     def make_ndhistogram(self, observ=None, cv_ranges=None,number_bins=None):
         ''' Construct histogram
@@ -204,27 +210,7 @@ class PmfNd(object):
             self.windowZero = setToZero
         else:
             self.windowZero = 0   
-           
-
-#     def _compute_prob(self):
-#         ''' compute probabilites once final weights are known
-# 
-#         '''
-#         
-#         prob = np.zeros_like(self.hist,dtype=np.float)
-#         for i,j in np.ndenumerate(self.hist):
-#             num = self.hist[i]
-#             U = self.Ub[i]
-#             logbf = self.f - self.beta * U + np.log(self.sim_samples_used)
-#             denom = compute_logsum(logbf)
-#             if num == 0:
-#                 #prob[i] = np.NAN
-#                 prob[i] = 0
-#             else:    
-#                 prob[i] = np.exp (np.log(num) - denom)
-# 
-#         self.prob = prob
-
+ 
     def unbiasedProb(self,f,c):
         ''' use wham equations, equation 15
         '''
@@ -243,29 +229,19 @@ class PmfNd(object):
 
 
 
-
-
-
-
-#     
-#    
-#     def divideProbwithSine(self,dim):
-#         ''' Divide by sine for  normalization
-#         
-#         Parameters:
-#             Dim: Either 'x' or 'y'
-#         '''
-#         
-#         if dim == 'x':
-#             logger.info("Diving 1st dimension with sine")
-#             for i in range(self.midp_xbins.size):
-#                 self.prob[i,:] = self.prob[i,:]/np.sin(np.radians(self.midp_xbins[i]))
-#         elif dim == 'y':             
-#             logger.info("Diving 2nd dimension with sine")
-#             for i in range(self.midp_ybins.size):
-#                 self.prob[:,i] = self.prob[:,i]/np.sin(np.radians(self.midp_ybins[i]))
-#         else:
-#             logger.critical("%s not recognized")
+    def divideProbwithSine(self,dim):
+        ''' Divide by sine for  normalization
+         
+        Parameters:
+            Dim: Either 'x' or 'y'
+        '''
+        
+        
+        logger.info("Diving %s dimension with sine",dim)
+        midpts = (self.histEdges[dim][1:] + self.histEdges[dim][:-1]) * 0.5
+        p = np.rollaxis(self.prob,dim,-1)
+        for i in range(midpts.size):
+                p[...,i] = p[...,i]/np.sin(np.radians(midpts[i]))
 
         
     def write_probabilities(self,filename):

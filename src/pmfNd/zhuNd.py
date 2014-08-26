@@ -135,47 +135,7 @@ class ZhuNd(PmfNd):
         
         f = np.exp(g)
         self.prob = self.unbiasedProb(f,np.exp(log_c))
-    
-        return np.exp(g)
+        self.f = f
         
 
-
-#     def _compute_prob(self):
-#         ''' compute probabilites once final F_k are known
-#             Does proper normalization for angle
-#         '''
-#         
-#         F_k = self.F_k
-#         prob = np.zeros_like(self.hist,dtype=np.float)
-#         for i,j in np.ndenumerate(self.hist):
-#             num = self.hist[i]
-#             U = self.Ub[i]
-#             logbf = F_k - self.beta * U + np.log(self.sim_samples_used)
-#             denom = compute_logsum(logbf)
-#             if num == 0:
-#                 #prob[i] = np.NAN
-#                 prob[i] = 0
-#             else:    
-#                 prob[i] = np.exp (np.log(num) - denom)
-# 
-#         self.prob = prob
-
-
-
-
-
-#         for i in xrange(self.midp_xbins.size):
-#             for j in xrange(self.midp_ybins.size):
-#                  num = self.hist[i, j]
-#                  U_b = self.U_bij[i, j, :]
-#                  logbf = self.beta * (F_k - U_b) + np.log(self.N_k)
-#                  #logbf[notzero] = self.beta * (F_k[notzero] - U_b[notzero]) + np.log(self.N_k[notzero])
-#                  denom = StatsUtils.compute_logsum(logbf)
-#                  if num == 0:
-#                      self.prob[i,j] = np.NAN
-#                  else:    
-#                      self.prob[i,j] = np.exp ( np.log(num) - denom )
-#         
-        
-        
  
