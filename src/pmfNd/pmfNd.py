@@ -3,21 +3,31 @@ import abc
 import numpy as np 
 import logging, sys, os
 import time
+from pmfcalculator import minimize
 
 
 np.seterr(all='raise',under='warn')
 logger = logging.getLogger(__name__)
 
+def compute_logsum(numpyArray):
+    ''' return log of sum of exponent of array
+        taken from MBAR
+    '''
+    ArrayMax = numpyArray.max()
+    return np.log(np.exp(numpyArray - ArrayMax ).sum() ) + ArrayMax
+
+
+
 
 class PmfNd(object):
-    ''' Class to compute N dimensional PMF
+    ''' Base Class to compute N dimensional PMF 
     
      Parameters
     --------------
-        bias: array of functions to compute biasing potentials
        temperature: float
               temperature in kelvin
     '''
+
     __metaclass__ = abc.ABCMeta
 
     
@@ -126,32 +136,136 @@ class PmfNd(object):
         self.cv_mask = cv_mask
         
         logger.info("%sd Histogram computed",ncv)
-
-
-    @abc.abstractmethod
-    def estimateFreeEnergy(self, **args ) :
-        ''' Abstract method for estimating free energy
-        '''
-        return
-    
-   
-    def divideProbwithSine(self,dim):
-        ''' Divide by sine for  normalization
         
-        Parameters:
-            Dim: Either 'x' or 'y'
-        '''
+
+    def setParams(self,Ub,f = None, histogramfile = None, fefile = None,
+                        ineff = None, chkpointfile = "chkp.fe.npz",
+                                  setToZero=None):
+        ''' set Ub and various other parameters
         
-        if dim == 'x':
-            logger.info("Diving 1st dimension with sine")
-            for i in range(self.midp_xbins.size):
-                self.prob[i,:] = self.prob[i,:]/np.sin(np.radians(self.midp_xbins[i]))
-        elif dim == 'y':             
-            logger.info("Diving 2nd dimension with sine")
-            for i in range(self.midp_ybins.size):
-                self.prob[:,i] = self.prob[:,i]/np.sin(np.radians(self.midp_ybins[i]))
+                Ub: array  shape [nbin_collvar1,nbin_collvar2... nbin_ncolvarN,Nsimulations]
+                    baising potential evalulated on histogram
+                
+                f: Array
+                    Initial estimate of weights
+                    
+                histogramfile: npz file
+                
+                fefile: npz file
+                
+                ineff: Array
+                    statistical inefficiency of each simulation
+                
+                chkpointfile: npzfile
+                
+                setToZero: list 
+                    reaction coordinate value where fe should be shifted to zero
+        
+        
+        '''
+            
+        self.Ub = Ub
+        
+        if os.path.isfile(histogramfile):
+            self.load_histogram(histogramfile)
+        
+        elif self.hist is None:
+            logger.debug("histogram not initialized") 
+            raise SystemExit("No histogram file and no histogram values ... Exiting")
+            
+        
+        if self.hist.flags["C_CONTIGUOUS"] == False:
+            self.hist = np.ascontiguousarray(self.hist, self.hist.dtype)
+            
+        self.hist = self.hist.astype(np.int64)
+        self.ndim = len(self.histEdges)
+        
+        if (f is None):
+            if (fefile is not None) and os.path.isfile(fefile):
+                logger.info("loading free energies from  %s", fefile)
+                self.f = np.load(fefile)['arr_0']
+            elif os.path.isfile(chkpointfile):
+                logger.info("loading free energies from chkpointfile %s", chkpointfile)
+                self.f = np.load(chkpointfile)['arr_0']
+            else:
+                logger.info("Initial Weights set to one")
+                self.f = np.ones(self.sim_samples.size)
+        else:        
+            logger.info("Initializing Free energies to user supplied values")
+            self.f = f
+        
+        if ineff is None:
+            self.ineff = np.ones_like(self.f)
         else:
-            logger.critical("%s not recognized")
+            self.ineff = ineff
+            
+            
+        if setToZero is not None:
+            self.windowZero = setToZero
+        else:
+            self.windowZero = 0   
+           
+
+#     def _compute_prob(self):
+#         ''' compute probabilites once final weights are known
+# 
+#         '''
+#         
+#         prob = np.zeros_like(self.hist,dtype=np.float)
+#         for i,j in np.ndenumerate(self.hist):
+#             num = self.hist[i]
+#             U = self.Ub[i]
+#             logbf = self.f - self.beta * U + np.log(self.sim_samples_used)
+#             denom = compute_logsum(logbf)
+#             if num == 0:
+#                 #prob[i] = np.NAN
+#                 prob[i] = 0
+#             else:    
+#                 prob[i] = np.exp (np.log(num) - denom)
+# 
+#         self.prob = prob
+
+    def unbiasedProb(self,f,c):
+        ''' use wham equations, equation 15
+        '''
+         
+        p = np.zeros(self.hist.shape)
+         
+        for i,j in np.ndenumerate(p):
+            denom = ( self.sim_samples_used * f * c[i]).sum()
+     
+            if denom > np.finfo(float).eps:
+                p[i] = self.hist[i]/ denom 
+            else:
+                p[i] = np.inf
+     
+        return p
+
+
+
+
+
+
+
+#     
+#    
+#     def divideProbwithSine(self,dim):
+#         ''' Divide by sine for  normalization
+#         
+#         Parameters:
+#             Dim: Either 'x' or 'y'
+#         '''
+#         
+#         if dim == 'x':
+#             logger.info("Diving 1st dimension with sine")
+#             for i in range(self.midp_xbins.size):
+#                 self.prob[i,:] = self.prob[i,:]/np.sin(np.radians(self.midp_xbins[i]))
+#         elif dim == 'y':             
+#             logger.info("Diving 2nd dimension with sine")
+#             for i in range(self.midp_ybins.size):
+#                 self.prob[:,i] = self.prob[:,i]/np.sin(np.radians(self.midp_ybins[i]))
+#         else:
+#             logger.critical("%s not recognized")
 
         
     def write_probabilities(self,filename):
@@ -185,11 +299,11 @@ class PmfNd(object):
         np.savez(filename, self.histEdges, self.pmf)
         logger.info("pmf written to %s " % filename)
         
-    def write_FreeEnergies(self,fefilename):
+    def writeWeights(self,fefilename):
         ''' write free energies to file
         '''
         logger.info("Saving free energies in file %s",fefilename)
-        np.savez(fefilename,self.F_k)
+        np.savez(fefilename,self.f)
 
     
     def load_histogram(self,histfile):
@@ -211,7 +325,7 @@ class PmfNd(object):
         '''
         
         a = np.load(filename)
-        self.midp_xbins, self.midp_ybins, self.pmf = a['arr_0'],a['arr_1'],a['arr_2']
+        self.histEdges, self.pmf = a['arr_0'],a['arr_1']
         logger.info("pmf loaded from %s " % filename)
         
     def write_histogram(self,histfile):
@@ -224,15 +338,48 @@ class PmfNd(object):
         logger.info("histogram file %s saved", histfile)
         
     ################################################
-    
-    def set_freeEnergies(self,F_k):
-        '''
-        '''
-        if (self.F_k.shape == F_k.shape) and (self.F_k.dtype == F_k.dtype):
-            self.F_k = F_k
-        else:
-            logger.critical("Cannot set free energies .. check shape and type")  
-   
+    # old code, works with 2d, Need to fix for Nd
+     
+#     def calcFrameWeight(self,x,y):
+#         ''' compute unnormalized weight of an individual frame
+#         '''
+#         
+#         U_b = self.bias.compute_potential_2D( paramsX=(self.fcxy[:,0], self.xyopt[:,0]),
+#                                               paramsY=(self.fcxy[:,1], self.xyopt[:,1]),
+#                                               x=x, y=y )
+#         logbf = self.beta * (self.F_k - U_b) + np.log(self.N_k)
+#         denom = StatsUtils.compute_logsum(logbf)
+#         try:
+#             w = 1./np.exp(denom)
+#         except ZeroDivisionError:
+#             logger.critical("weight w is infinite! ... I will quit")
+#             raise SystemExit
+#         
+#         return w
+#         
+#     def getWindow(self,rcoords):
+#         ''' get state number from reaction coordinate values
+#         
+#         Parameters: 
+#             rcoords: list with two elements
+#         
+#         Returns:
+#             state: integer
+#             
+#         '''
+#         
+#         rcx,rcy = rcoords
+#         
+#         sindexx = np.digitize([rcx], self.x0) 
+#         sindexy = np.digitize([rcy], self.y0)
+#         
+#         umbNo = sindexx * self.y0.size + sindexy
+#         
+#         logger.info("state with x0,y0: %s,%s will be set to zero",self.xyopt[umbNo,0],self.xyopt[umbNo,1])
+#         
+#         return umbNo
+#   
+ 
         
         
     

@@ -9,7 +9,7 @@ import os,logging,sys,shutil,glob
 import pmfcalculator
 import smooth as sm
 from pmfcalculator.readerNd import ReaderNd
-from pmfcalculator.pmfNd import ZhuNd
+from pmfcalculator.pmfNd import ZhuNd,WhamNd
 import pmfcalculator.potentials as bpot
 
 logger = logging.getLogger("pmfcalculator")
@@ -241,14 +241,13 @@ class testpmfNd_D1():
             
         self.yamlfile = "dummy.yaml"
         
-    def genpmf(self):
+    def genpmf(self,calc):
         prj = ReaderNd(self.yamlfile)
         observ = prj.read_xvgfiles()
         cv_ranges = [(0.0,7.95)]
         number_bins =[100]
         histFN = "hist.npz"
 
-        calc = ZhuNd(temperature =300.0)
         calc.make_ndhistogram(observ=observ,cv_ranges=cv_ranges,number_bins=number_bins)
         #vardict = {}
         #for key,value in prj.vardict.items():
@@ -267,9 +266,12 @@ class testpmfNd_D1():
         
         zeroState = idxL[0]
         calc.write_histogram(histFN)
-        calc.estimateFreeEnergy(Ub,histogramfile=histFN,setToZero=zeroState)
-        calc.write_FreeEnergies("feNd.npz")
+        
+        calc.setParams(Ub,histogramfile=histFN,setToZero=zeroState)
+        calc.estimateWeights()
+        calc.writeWeights("feNd.npz")
         calc.write_probabilities("probNd.npz")
+        
         calc.probtopmf()
         calc.write_pmf("pmfNd.npz")
         self.plotpmf("pmfNd.npz")
@@ -310,5 +312,8 @@ class testpmfNd_D1():
         
 if __name__ == "__main__":
     test = testpmfNd_D1()
-    test.genpmf()
+    calc = ZhuNd(temperature =300.0)
+    calc1 = WhamNd(temperature =300.0)
+
+    test.genpmf(calc1)
     test.clean()        
