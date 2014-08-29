@@ -7,6 +7,74 @@ import logging,sys,os
 logger = logging.getLogger(__name__)
 
 
+def compute_stat_inefficiency(observ):
+    ''' computes iacts
+    '''
+    logger.info("computing IACTS")
+    ineff = []
+
+    for sim in observ:
+        simIneff = []
+        for j in range(sim.shape[1]):
+            simIneff.append( timeseries.statisticalInefficiency( sim[:,j] ) )
+        
+        ineff.append(simIneff)
+    
+    ineff = np.array(ineff,dtype=np.float)
+    
+    logger.info("IACTS computed")
+    return ineff
+
+def subsample(observ,ineff):
+    ''' subsample according to largest inefff
+    
+     Parameters
+    -------------
+        observ: list of arrays
+        ineff: array with ineff for each column of observ
+     Return
+    -----------
+        newObserv: list of arrays subsampled according to ineff
+    '''
+    logger.info("Subsampling using given ICATS")
+    newObserv = [] 
+    maxineff = ineff.max(axis = 1)
+    for i,sim in enumerate(observ):
+        
+        indices = timeseries.subsampleCorrelatedData(sim, g = maxineff[i])
+        newsim = sim[indices,...]
+        newObserv.append(newsim)
+        logger.debug("Original %s New %s",sim.shape[0],newsim.shape[0])
+ 
+    logger.info("Subsampled using given ICATS")
+    return newObserv
+
+def bootstrap(observ):
+    ''' boot strap given list of arrays
+    
+    Parameters
+    ------------
+    observ: list of arrays
+    
+    Return
+    --------
+    bootobserv: list of arrays
+    
+    
+    '''
+    logger.info("Generating subsamples by random picking")
+    bootObserv = []
+    for sim in observ:
+        idx = np.arange(sim.shape[0])
+        ridx = nprand.choice(idx, replace = True)
+        newsim = sim[ridx,...]
+        bootObserv.append(newsim)
+
+    logger.info("Random subsample generated")    
+    return bootObserv
+
+
+
 def compute_stat_inefficiency2D(pos_xkn,pos_ykn,N_k):
     ''' computes iacts
     '''

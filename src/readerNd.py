@@ -40,6 +40,11 @@ class ReaderNd():
         self.xtcdir=records['xtcdir']
         self.stride=records['stride']
         self.biasType=records["bias"]
+        #### Arguments for estimating pmf#######
+        self.binranges=zip(records["ranges"][::2],records["ranges"][1::2])
+        self.nbins=records["nbins"]
+        self.setToZero=records["setzero"]
+        
         
         if len(self.biasType) != len(self.collvars):
             raise SystemExit("number of collvars and bias are different .. Exiting")

@@ -11,6 +11,7 @@ import smooth as sm
 from pmfcalculator.readerNd import ReaderNd
 from pmfcalculator.pmfNd import ZhuNd,WhamNd
 import pmfcalculator.potentials as bpot
+import pmfcalculator.StatsUtils as utils
 
 logger = logging.getLogger("pmfcalculator")
 
@@ -21,7 +22,7 @@ def create_pmf(rc_beg=0,rc_end=8,npts=8001,hp=(4,2,5),smw=300,outf="refpmf.dat")
     """
     Create a test pmf by adding a harmonic potential of given width at a given point
     NOTE: The potential is smoothed afterwards
-    
+
     Parameters:
         rc_beg: begining of reaction coordinate (rc)
         rc_end: end of reaction coordinate
@@ -32,7 +33,7 @@ def create_pmf(rc_beg=0,rc_end=8,npts=8001,hp=(4,2,5),smw=300,outf="refpmf.dat")
     Returns:
         pmf: 2D numpy array with rc as its 1st column and PMF as its 2nd column
     """
-    
+
     x0=hp[0]
     xb=x0-hp[1]
     xe=x0+hp[1]
@@ -53,14 +54,14 @@ def create_pmf(rc_beg=0,rc_end=8,npts=8001,hp=(4,2,5),smw=300,outf="refpmf.dat")
     for i in range(ysm.size):
         OF.write("%s %s\n"%(x[i],ysm[i]))
     pmf[:,1]=ysm
-    
+
     print "File %s successfully written"%outf
     return pmf
 
 def gen_harmonic_potentials(x,ks,x0s):
-    """ 
+    """
     Calculate harmonic potential as (0.5 * k * (x-x0)^2)
-    
+
     Parameters:
         x: position array
         ks: array of force constants
@@ -68,7 +69,7 @@ def gen_harmonic_potentials(x,ks,x0s):
      Returns:
          U_kn: 2D array of potential with x as rows and potential as columns
     """
-    
+
     U_kn=np.zeros((len(ks),x.size),dtype=np.float)
     for i in range(len(ks)):
         u=0.5* ks[i] * (x-x0s[i])**2
@@ -79,9 +80,9 @@ def gen_harmonic_potentials(x,ks,x0s):
 def convert_pot_to_prob(x,pot,RT):
     """
     Convert potential to probability p=exp(-beta * U)
-     
+
     """
-    
+
     p=np.exp(-1*pot*RT)
     p=p/p.sum()
     return p
@@ -96,18 +97,18 @@ def write_probs(fn,x,p):
 def generate_samples_from_prob(x,prob,n=50000):
     """
      Generate numbers with a given probability distribution
-     
+
      Parameters:
-     
+
          x: array along which number will be generated
          prob: array of probability distribution of x such that sum(x)=1
          n: number of samples to generate
-         
+
      Returns:
-         randn: array of samples of size n 
-         
+         randn: array of samples of size n
+
     """
-    
+
     cdf=np.cumsum(prob)
     binindex=np.arange(cdf.size)
     eps=10e-8
@@ -119,13 +120,13 @@ def generate_samples_from_prob(x,prob,n=50000):
     return randn
 
 def write_samples(fn,x0,data):
-    
+
     OF=open(fn,'w')
     for i in range(data.size):
         OF.write("%10d%10.5f\n" % (i,data[i]))
     OF.close()
     print "%s written"%fn
-    
+
 def write_samples_alan(fn,x0,data):
     if not os.path.isfile(fn):
         OF=open(fn,'w')
@@ -137,7 +138,7 @@ def write_samples_alan(fn,x0,data):
 
 def gen_yaml(yamlfile,datadir,x0s,ks):
     'generate Yaml file'
-    
+
     trials=['R1']
     systems=["dummy"]
     Vars=["%3.2f"%x0s[i] for i in range(x0s.size)]
@@ -154,10 +155,14 @@ def gen_yaml(yamlfile,datadir,x0s,ks):
     OF.write("pos_fc: %s\n"%ks.tolist())
     OF.write("pos_x0: %s\n"%x0s.tolist())
     OF.write("bias: %s\n"%"['harmonic']")
+    OF.write("ranges: %s\n"%"[0.0,7.95]")
+    OF.write("nbins: %s\n"%"[100]")
+    OF.write("setzero: %s\n"%"[7.0]")
+
     OF.close()
-    
+
 def convert_pmf_to_force(pmf):
-  
+
     x=pmf[:,0]
     y=pmf[:,1]
     force=np.zeros((x.size-1,y.size-1))
@@ -183,11 +188,11 @@ def gen_alan_metadata(x0s,fcs):
         fn="%s/data1d/R1_xa1_%3.2f_dh.xvg"%(os.getcwd(),x0s[i])
         OF.write("%s %s %s\n"%(fn,x0s[i],fcs[i]))
     OF.close()
-    
 
-    
+
+
 def createTestData():
-  
+
     # create pmf and writes it to pmf.dat file.
     # Add PMF potential to the harmonic potential
     # generates harmonic potentials
@@ -195,7 +200,7 @@ def createTestData():
     # Generate samples that follow the given distribution
     T=300.0 # temperature in kelvin
     RT=8.3144*T/1000.
-      
+
     nx0=160 # number of points along rc where samples will be generated
     fc=500  # force constant for harmonic potential
     rc_beg=0
@@ -204,14 +209,14 @@ def createTestData():
     yamlfile = "dummy.yaml"
     if not os.path.isdir(datadir):
         os.mkdir(datadir)
-    
-    
+
+
     pmf=create_pmf(rc_beg=rc_beg,rc_end=rc_end,npts=8001,hp=(4,2,5),smw=300,outf="refpmf.dat")
     x=pmf[:,0]
     x0s=np.linspace(rc_beg,rc_end,nx0+2)[1:-1]
     fcs=np.zeros(nx0)+fc
     U_kn=gen_harmonic_potentials(x,fcs,x0s)
-    
+
     for i in range(nx0):
         # Add PMF potential to the harmonic potential
         U_kn[i,:]=U_kn[i,:]+pmf[:,1]
@@ -231,65 +236,70 @@ def createTestData():
 
 
 class testpmfNd_D1():
-    
+
     def __init__(self):
         print "\n Creating Test Data \n"
-        if not os.path.isdir("1D"): 
+        if not os.path.isdir("1D"):
             createTestData()
         else:
             print("Directory 1D Exists ... will not regenerate")
-            
+
         self.yamlfile = "dummy.yaml"
-        
+
     def genpmf(self,calc):
         prj = ReaderNd(self.yamlfile)
         observ = prj.read_xvgfiles()
-        cv_ranges = [(0.0,7.95)]
-        number_bins =[100]
+        cv_ranges = prj.binranges
+        number_bins = prj.nbins
         histFN = "hist.npz"
+        ineffFN = "ineff.npz"
 
-        calc.make_ndhistogram(observ=observ,cv_ranges=cv_ranges,number_bins=number_bins)
-        #vardict = {}
-        #for key,value in prj.vardict.items():
-        #    vardict[key] = np.array(value,dtype=np.float)
-        #    print vardict[key]
-        
-        Ub = bpot.biasPotential(prj.biasType,prj.collvars,prj.vardict,calc.histEdges)
-        
-        #print Ub[0,:]
-        #sys.exit()
-        setZero = [7]
+
+        setZero = prj.setToZero
         idxL = []
         for i,key in enumerate(prj.collvars):
-            idx = np.digitize([setZero[i]],prj.vardict[key + "_x0"]) 
+            idx = np.digitize([setZero[i]],prj.vardict[key + "_x0"])
             idxL.append(idx[0])
-        
+
         zeroState = idxL[0]
+
+        if not os.path.isfile(ineffFN):
+            ineff = utils.compute_stat_inefficiency(observ)
+            np.savez(ineffFN,ineff)
+        else:
+            ineff = np.load(ineffFN)['arr_0']
+
+        maxIneff =  ineff.max(axis=1)
+        maxIneff = np.around(maxIneff,decimals=2)
+
+        calc.make_ndhistogram(observ=observ,cv_ranges=cv_ranges,number_bins=number_bins,ineff=maxIneff)
+        Ub = bpot.biasPotential(prj.biasType,prj.collvars,prj.vardict,calc.histEdges)
+
         calc.write_histogram(histFN)
-        
+
         calc.setParams(Ub,histogramfile=histFN,setToZero=zeroState)
         calc.estimateWeights()
         calc.writeWeights("feNd.npz")
         calc.write_probabilities("probNd.npz")
-        
+
         calc.probtopmf()
         calc.write_pmf("pmfNd.npz")
         self.plotpmf("pmfNd.npz")
-        
+
     def runTest(self):
         self.assertTrue(os.path.isfile(self.yamlfile))
         self.genpmf()
         self.plotpmf("pmfNd.npz")
-        
-    
-    
+
+
+
     def plotpmf(self,infile):
         import matplotlib.pyplot as plt
-        
+
         a=np.load(infile)
         edges = a['arr_0']
         pmf = a['arr_1']
-        
+
         b = np.loadtxt("refpmf.dat")
         midp = (edges[0][1:] + edges[0][:-1])*0.5
         #print midp
@@ -304,16 +314,16 @@ class testpmfNd_D1():
         rmfiles = ['dummy.yaml'] + glob.glob("*.npz")
         if os.path.isdir(testdir):
             shutil.rmtree(testdir)
-        
+
         for file in rmfiles:
             os.remove(file)
-        
-        
-        
+
+
+
 if __name__ == "__main__":
     test = testpmfNd_D1()
     calc = ZhuNd(temperature =300.0)
-    calc1 = WhamNd(temperature =300.0)
+    #calc = WhamNd(temperature =300.0)
 
-    test.genpmf(calc1)
-    test.clean()        
+    test.genpmf(calc)
+    test.clean()
