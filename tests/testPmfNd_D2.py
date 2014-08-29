@@ -13,8 +13,9 @@ import smooth as sm
 from pmfcalculator.pmf2d import Wham2d
 
 
+import pmfcalculator.StatsUtils as utils
 from pmfcalculator.readerNd import ReaderNd
-from pmfcalculator.pmfNd import ZhuNd
+from pmfcalculator.pmfNd import ZhuNd,WhamNd
 import pmfcalculator.potentials as bpot
 import pmfcalculator
 
@@ -67,7 +68,7 @@ def add_sine_potential(x,forcek,mult):
     return y-y.max()
 
 def create_2d_pmf(x,y,Xparams,Yparams,outf="2dpmf.npz"):
-    
+
     print "creating 2d pmf"
     well_minpos=4
     well_width=2
@@ -86,11 +87,11 @@ def create_2d_pmf(x,y,Xparams,Yparams,outf="2dpmf.npz"):
     np.savez(outf,[x,y],Z.transpose())
     print "Saved"
     return X,Y,Z
-    
+
 def gen_harmonic_potentials(x,ks,x0s):
-    """ 
+    """
     Calculate harmonic potential as (0.5 * k * (x-x0)^2)
-    
+
     Parameters:
         x: position array
         ks: array of force constants
@@ -98,7 +99,7 @@ def gen_harmonic_potentials(x,ks,x0s):
      Returns:
          U_kn: 2D array of potential with x as rows and potential as columns
     """
-    
+
     U_kn=np.zeros((len(ks),x.size),dtype=np.float)
     for i in range(len(ks)):
         u=0.5* ks[i] * (x-x0s[i])**2
@@ -107,7 +108,7 @@ def gen_harmonic_potentials(x,ks,x0s):
 
 
 def gen_cosine_potentials(x,ks,x0s):
-    
+
     U_kn=np.zeros((len(ks),x.size),dtype=np.float)
     for i in range(len(ks)):
         u=ks[i] * (1- np.cos(np.radians(x-x0s[i])))
@@ -116,9 +117,9 @@ def gen_cosine_potentials(x,ks,x0s):
 
 def convert_pot_to_prob(V,RT):
     """
-    Convert potential to probability p=exp(-beta * U) 
+    Convert potential to probability p=exp(-beta * U)
     """
-    
+
     p=np.exp(-1*V*RT)
     p=p/p.sum()
     return p
@@ -126,22 +127,22 @@ def convert_pot_to_prob(V,RT):
 def generate_samples_from_2dprob(P,x,y,n=500000):
     """
      Generate numbers with a given probability distribution
-     
+
      Parameters:
-     
+
          x: array along which number will be generated
          prob: array of probability distribution of x such that sum(x)=1
          n: number of samples to generate
-         
+
      Returns:
-         randn: array of samples of size n 
-         
+         randn: array of samples of size n
+
     """
     #vals=np.zeros((n,2))
     #for i in range(n):
         #vals[i,0],vals[i,1]=get_random2d(x,y,P,n)
     vals=get_random2d(x,y,P,n)
-    
+
 
     return vals
 
@@ -154,7 +155,7 @@ def write_2dsamples(fn,data):
 
 def gen_yaml(yamlfile,x0s,y0s,kx,ky):
     'generate Yaml file'
-    
+
     trials=['R1']
     systems=["dummy"]
     positions=["%3.2f"%x0s[i] for i in range(x0s.size)]
@@ -175,8 +176,13 @@ def gen_yaml(yamlfile,x0s,y0s,kx,ky):
     OF.write("pos_fc: %s\n"%kx.tolist())
     OF.write("angles_fc: %s\n"%ky.tolist())
     OF.write("bias: %s\n"%"['harmonic', 'cosine']")
+    OF.write("ranges: %s\n"%"[2.1,5.8,41,179]")
+    OF.write("nbins: %s\n"%"[40,40]")
+    OF.write("setzero: %s\n"%"[3,110]")
+
+
     OF.close()
-    
+
 def gen_samples(args):
     i,Ux,npts1,npts2,PMF,RT,ny0,U_kn2,x,y,x0s,y0s = args
     for j in range(ny0):
@@ -187,33 +193,33 @@ def gen_samples(args):
         sample=generate_samples_from_2dprob(P,x,y,n=10000)
         fn="2D/R1_dummy_%3.2f_%3.2f_dh.xvg"%(x0s[i],y0s[j])
         write_2dsamples(fn,sample)
-       
- 
-    
-
-  
 
 
 
-    
+
+
+
+
+
+
 def createTestData(pool):
-  
+
     T=300.0 # temperature in kelvin
     RT=8.3144621*T/1000.
     rc1_beg=2
     rc1_end=6
-    npts1=80
+    npts1=160
     rc2_beg=40
     rc2_end=180
-    npts2=45
-    
+    npts2=90
+
     nx0=40 # number of points along rc where samples will be generated
     ny0=45
     #nx0=40 # number of points along rc where samples will be generated
     #ny0=20
     fcx0=100  # force constant for harmonic potential
     fcy0=100
-    
+
     datadir = "2D"
     yamlfile = "dummy.yaml"
     refpmf_file="refpmf2d.npz"
@@ -226,7 +232,7 @@ def createTestData(pool):
     y0s=np.linspace(rc2_beg,rc2_end,ny0+2)[1:-1]
     fcsx=np.zeros(nx0)+fcx0
     fcsy=np.zeros(ny0)+fcy0
- 
+
     #size is npts2,npts1
 
     X,Y,PMF = create_2d_pmf(x,y,Xparams,Yparams,outf=refpmf_file)
@@ -262,58 +268,58 @@ def createTestData(pool):
         arg10.append(y)
         arg11.append(x0s)
         arg12.append(y0s)
-        
+
     args=zip(arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10,arg11,arg12)
     pool.map(gen_samples,args)
-    
+
 
 
 class testpmfNd_D2():
-    
-    def __init__(self,pool):
+
+    def __init__(self,pool,temperature=300.0):
         print "\n Creating Test Data \n"
         self.yamlfile = "dummy.yaml"
-        
-        if not os.path.isfile(self.yamlfile): 
+
+        if not os.path.isfile(self.yamlfile):
             createTestData(pool)
         else:
             print("File Exists ... will not regenerate test data")
-            
-        
-        self.number_bins = [41, 41] 
-        self.temperature = 300
-        self.cv_ranges = [(2.0, 6.0),( 40.0, 180.0)] 
-        self.setZero = [6.0,90.0] 
-        
-        
-        
-        
-        
+
+
+        self.number_bins = [41, 41]
+        self.temperature = temperature
+        self.cv_ranges = [(2.0, 6.0),( 40.0, 180.0)]
+        self.setZero = [6.0,90.0]
+
+
+
+
+
     def plotpmf(self,pmf2dfile):
         '''plot 2d pmf from files
-        
+
         '''
         import matplotlib as mpl
         import matplotlib.pyplot as plt
         a = np.load(pmf2dfile)
         x,y = a['arr_0']
         Z = a['arr_1']
-        
+
         if len(x) == Z.shape[0] + 1:
             midx = (x[1:] + x[:-1]) * 0.5
             midy = (y[1:] + y[:-1]) * 0.5
         else:
             midx = x
             midy = y
-            
+
         #y = a['arr_1']
         X, Y = np.meshgrid(midy, midx)
 
         print x.shape,y.shape,X.shape,Y.shape,Z.shape
-        
+
         mask = np.isnan(Z)
         Z = np.ma.masked_array(data=Z, mask=mask)
-        
+
         # cmap=mpl.cm.gist_earth
         cmap = mpl.cm.jet
         fig = plt.figure()
@@ -323,7 +329,7 @@ class testpmfNd_D2():
         p1 = ax.contourf(X, Y, Z, cmap=cmap, levels=levels)
         # p1=ax.pcolor(X,Y,Z,cmap=cmap)
         cbar = plt.colorbar(p1, ax=ax, format="%4.1f")
-    
+
         #ax.axis([0, 180, 0, 8])
         ax.grid()
         ax.set_xlabel("Angle (Degrees)")
@@ -331,18 +337,16 @@ class testpmfNd_D2():
         cbar.set_label("PMF (kJ/mol)")
         plt.savefig(pmf2dfile.replace(".npz", ".png"))
         createTestData
-        
-    def genpmf(self):
+
+    def genpmf(self,calc,obsFN,histFN,pmfFN,ineffFN):
         prj = ReaderNd(self.yamlfile)
-        obsFN="observ.npz"
-        zhuhistFN = "zhuhist.npz"
         #whamhistFN = "whamhist.npz"
-        number_bins = self.number_bins 
+        number_bins = prj.nbins
         temperature = self.temperature
-        cv_ranges = self.cv_ranges 
-        setZero = self.setZero
-        
-         
+        cv_ranges = prj.binranges
+        setZero = prj.setToZero
+
+
         if not os.path.isfile(obsFN):
             print("Reading xvgs ..")
             observ = prj.read_xvgfiles()
@@ -350,87 +354,43 @@ class testpmfNd_D2():
         else:
             print("loading %s"%obsFN)
             observ = np.load(obsFN)['arr_0']
-            
-        calcZhu = ZhuNd(temperature = temperature)  
-        
-        if not os.path.isfile(zhuhistFN):
-            calcZhu.make_ndhistogram(observ=observ,cv_ranges=cv_ranges,number_bins=number_bins)
-            calcZhu.write_histogram(zhuhistFN)
+
+         ### Compute pmf with stat inefficiencies
+        if not os.path.isfile(ineffFN):
+            ineff = utils.compute_stat_inefficiency(observ)
+            np.savez(ineffFN,ineff)
+        else:
+            ineff = np.load(ineffFN)['arr_0']
+
+
+        maxIneff =  ineff.max(axis=1)
+        maxIneff = np.around(maxIneff,decimals=0)
+        #maxIneff = np.ones(ineff.size)
+        if not os.path.isfile(histFN):
+            calc.make_ndhistogram(observ=observ,cv_ranges=cv_ranges,number_bins=number_bins,ineff=maxIneff)
+            calc.write_histogram(histFN)
         else:
             print("loading histogram")
-            calcZhu.load_histogram(zhuhistFN)
-            
-        Ub = bpot.biasPotential(prj.biasType,prj.collvars,prj.vardict,calcZhu.histEdges)
-        calcZhu.setParams(Ub,histogramfile=zhuhistFN)
-        calcZhu.estimateWeights()
-        calcZhu.divideProbwithSine(dim=1)
-        calcZhu.probtopmf()
-        calcZhu.write_pmf("pmf2d.npz")
-        
-        
-        
-        #y0 = np.array(prj.vardict["angles_x0"])    
-        #x0 = np.array(prj.vardict["pos_x0"])    
-        #kx = np.array(prj.vardict["pos_fc"])    
-        #ky = np.array(prj.vardict["angles_fc"])
-        #pos_xkn = []
-        #pos_ykn = []
-        #N_k = []    
-        #for i in range(len(observ)):
-        #    pos_xkn.append(observ[i][:,0])
-        #    pos_ykn.append(observ[i][:,1])
-        #    N_k.append(observ[i].shape[0])
-            
-        #pos_xkn = np.array(pos_xkn)
-        #pos_ykn = np.array(pos_ykn)
-        #N_k = np.array(N_k)
-        
-        
-        #bias = pmfcalculator.Harmonic_cosine()
-        #calcWham = Wham2d(bias,maxiter=1,tol=1e-7,nbins=self.number_bins,
-        #          temperature=self.temperature, x0=x0, y0=y0,fcx=kx,fcy=ky,
-        #          chkdur=100)
-        
-        
-        
-        
-#         if not os.path.isfile(whamhistFN):
-#             calcWham.make_2dhistogram(pos_kn=[pos_xkn,pos_ykn],N_k=N_k, 
-#                        binrange= self.cv_ranges )
-#             
-#             calcWham.write_histogram(whamhistFN)
-#         else:
-#             pass
-#         
-#         hist, x, y, n_k, xedges, yedges = calcWham.load_histogram(whamhistFN)
+            calc.load_histogram(histFN)
 
-        #calcWham.estimateFreeEnergy(histogramfile=whamhistFN,setToZero =[4,110] )
-            
-            
-        
-        #print "histgroam same? %s"%(np.array_equal(hist, calcZhu.hist))
-        
-        #print np.array_equal(calcWham.U_bij, Ub)
-        #print ((Ub - calcWham.U_bij)**2).sum()
-        
-        
-        
-#         calc.write_FreeEnergies("feNd.npz")
-# 
-        
-#         
-#         calc.write_probabilities("probNd.npz")
-        
+        Ub = bpot.biasPotential(prj.biasType,prj.collvars,prj.vardict,calc.histEdges)
+        calc.setParams(Ub,histogramfile=histFN)
+        calc.estimateWeights()
+        calc.divideProbwithSine(dim=1)
+        calc.probtopmf()
+        calc.write_pmf("pmf2d.npz")
+
+
     def run_wham2d(self):
-        
+
         bias = pmfcalculator.Harmonic_cosine()
         prj = ReaderNd(self.yamlfile)
-      
-        y0 = np.array(prj.vardict["angles_x0"])    
-        x0 = np.array(prj.vardict["pos_x0"])    
-        kx = np.array(prj.vardict["pos_fc"])    
+
+        y0 = np.array(prj.vardict["angles_x0"])
+        x0 = np.array(prj.vardict["pos_x0"])
+        kx = np.array(prj.vardict["pos_fc"])
         ky = np.array(prj.vardict["angles_fc"])
-            
+
         obsFN="observ.npz"
         if not os.path.isfile(obsFN):
             print("Reading xvgs ..")
@@ -439,41 +399,41 @@ class testpmfNd_D2():
         else:
             print("loading %s"%obsFN)
             observ = np.load(obsFN)['arr_0']
-            
+
         pos_xkn = []
         pos_ykn = []
-        N_k = []    
+        N_k = []
         for i in range(len(observ)):
             pos_xkn.append(observ[i][:,0])
             pos_ykn.append(observ[i][:,1])
             N_k.append(observ[i].shape[0])
-            
+
         pos_xkn = np.array(pos_xkn)
         pos_ykn = np.array(pos_ykn)
         N_k = np.array(N_k)
-        
+
         print pos_xkn.shape
         histFN = "hist.npz"
         probFN = "prob.npz"
         pmfFN= "pmf2d.npz"
-        
+
         calc = Wham2d(bias,maxiter=10000,tol=1e-7,nbins=self.number_bins,
                   temperature=self.temperature, x0=x0, y0=y0,fcx=kx,fcy=ky,
                   chkdur=100)
         if not os.path.isfile(histFN):
-            calc.make_2dhistogram(pos_kn=[pos_xkn,pos_ykn],N_k=N_k, 
+            calc.make_2dhistogram(pos_kn=[pos_xkn,pos_ykn],N_k=N_k,
                        binrange= self.cv_ranges )
-            
+
             calc.write_histogram(histFN)
-            
+
         calc.estimateFreeEnergy(histogramfile=histFN,setToZero =[4,110] )
         calc.divideProbwithSine(dim='y')
         calc.write_probabilities(probFN)
         calc.probtopmf()
         calc.write_pmf(pmfFN)
-        
-        
-        
+
+
+
 
     def clean(self):
         testdir = "2D"
@@ -481,19 +441,25 @@ class testpmfNd_D2():
         rmfiles = ['dummy.yaml'] + glob.glob("*.npz")
         if os.path.isdir(testdir):
             shutil.rmtree(testdir)
-        
+
         for file in rmfiles:
             os.remove(file)
-         
+
 
 
 if __name__ == "__main__":
-    
+    obsFN="observ.npz"
+    histFN = "zhuhist.npz"
+    pmfFN = "pmf2d.npz"
+    ineffFN = "ineffNd.npz"
+    calc = ZhuNd(temperature = 300.0,scIterations = 10)
+    #calc = WhamNd(temperature = 300.0)
+
     pool=Pool(processes=1)
     test = testpmfNd_D2(pool)
-    #test.plotpmf("refpmf2d.npz")
-    test.genpmf()
+    test.plotpmf("refpmf2d.npz")
+    test.genpmf(calc,obsFN,histFN,pmfFN,ineffFN)
     #test.run_wham2d()
     test.plotpmf("pmf2d.npz")
     #test.clean()
-    
+

@@ -3,9 +3,11 @@ import numpy as np
 import argparse 
 import logging, sys, os
 import numpy.random as nprand
-import pmfcalculator 
-from pmfcalculator.pmfNd import ZhuNd
+import pmfcalculator
+from pmfcalculator import ReaderNd 
+from pmfcalculator.pmfNd import ZhuNd,WhamNd
 import pmfcalculator.StatsUtils as utils
+import pmfcalculator.potentials as bpot
 
  
 ########################################
@@ -18,11 +20,11 @@ des = '''calc1dpmf.py: Calculate 1d pmf.
 parser = argparse.ArgumentParser(description=des    
     , formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("-method", dest='method', default='WHAM', help='WHAM | ZHU | MBAR ')
+parser.add_argument("-method", dest='method', default='WHAM', help='WHAM | ZHU ')
 
 parser.add_argument("-projfile", dest='prjfile', default='proj.yaml', help='Project file')
 
-parser.add_argument("-maxiter", dest='maxiter', help='Maximum self consistent iteration',
+parser.add_argument("-maxiter", dest='maxiter', help='Maximum self consistent iteration. Ignored in ZHU method',
     default=100, type=int)
 
 
@@ -32,24 +34,33 @@ parser.add_argument("-readupto", dest='readupto', help='number of lines to read'
 parser.add_argument("-temperature", dest='temperature', help='Temerature in kelvin',
         default=300.0, type=float)
 
-parser.add_argument("-tolerance", dest='tol', help='Tolerance for self consistent iterations',
+parser.add_argument("-tolerance", dest='tol', help='Tolerance for self consistent iterations. Ignored with ZHU',
         default=1e-4, type=float)
 
 parser.add_argument("-histfile", dest='histfile',
         help='histogram file name. Will be used to store histogram',
-        default="hist1d.npz")
+        default="histNd.npz")
+
+parser.add_argument("-observfile", dest='observFN',
+        help='npz file with observations',
+        default="observNd.npz")
 
 parser.add_argument("-probfile", dest='probfile',
         help='probability file name. Will be used to store probabilities',
-        default="prob1d.npz")
+        default="probNd.npz")
 
 parser.add_argument("-pmffile", dest='pmffile',
         help='pmf file name. Will be used to store pmf',
-        default="pmf1d.txt")
+        default="pmfNd.npz")
 
 parser.add_argument("-fefile", dest='fefile',
         help='free energy file name. Will be used to store free energies',
-        default="fe1d.npz")
+        default="feNd.npz")
+
+parser.add_argument("-chkpfile", dest='chkpfile',
+        help='checkpoint filename',
+        default="chkp.fe.npz")
+
 
 parser.add_argument("-nbootstrap", dest='nbootstrap',
         help='number of bootstraps', type=int,
@@ -62,16 +73,16 @@ parser.add_argument("-bootbegin",dest='bootbegin',
 parser.add_argument("-chkdur", dest='chkdur', help='Number of iteration after to save chkpoint files',
         default=10, type=int)
 
-parser.add_argument("-nbins", dest='nbins',
-        help='number of bins', default=100, type=int)
+# parser.add_argument("-nbins", dest='nbins',
+#         help='number of bins', default=100, type=int)
 
-parser.add_argument("-range", dest='binrange',
-        help='range(start,end). Input 2 numbers seperated by spaces',
-        default=[0.0, 0.0], nargs=2, type=float)
+# parser.add_argument("-range", dest='binrange',
+#         help='range(start,end). Input 2 numbers seperated by spaces',
+#         default=[0.0, 0.0], nargs=2, type=float)
 
-parser.add_argument("-zerofe",dest='setToZero',
-        help='window value where free energy should be set to zero ',
-        default=None, type=float)
+# parser.add_argument("-zerofe",dest='setToZero',
+#         help='window value where free energy should be set to zero ',
+#         default=None, type=float)
 
 parser.add_argument("-inefffile", dest='inefffile',
         help='inefficiency file name. Will be used to store inefficiencies',
@@ -86,67 +97,87 @@ parser.add_argument("--average_subsample", action="store_true", dest="bAverage",
 
 
 def main(args):
-    # if all elements in binrange are zero then set args.binrange to None
-    if all(x == 0 for x in args.binrange):
-        args.binrange = None
-    else:
-        binrange = (args.binrange[0], args.binrange[1])
-        args.binrange = binrange
 
     ## Read Project file
-    prj = pmfcalculator.ReaderNd(infile=args.prjfile)
+    prj = ReaderNd(infile=args.prjfile)
+    
+    # if all elements in binrange are zero then set args.binrange to None
+    if all(x == 0 for x in prj.binranges):
+        binranges = None
+    else:
+        binranges = prj.binranges
+        
+    if prj.setToZero == None:
+        setToZero = None
+    else:
+        setToZero = prj.setToZero
+    
     # Read Data
-    logger.info("Reading files ...")    
-    pos_kn, N_k = prj.read_xvgfiles(readupto=args.readupto)
-    logger.info("files read.")    
+    if not os.path.isfile(args.observFN):
+        logger.info("Reading files ...")    
+        observ = prj.read_xvgfiles(readupto=args.readupto)
+        logger.info("files read. Now saving %s",args.observFN)
+        np.savez(args.observFN,observ)
+    else:
+        logger.info("loading %s",args.observFN)
+        observ = np.load(args.observFN)['arr_0']
+        
+            
     
     ### Compute pmf with stat inefficiencies
     if not os.path.isfile(args.inefffile):
-        ineff = utils.compute_stat_inefficiency1D(pos_kn, N_k)
+        ineff = utils.compute_stat_inefficiency(observ)
         np.savez(args.inefffile,ineff)
     else:
         ineff = np.load(args.inefffile)['arr_0']
     
-    bias = pmfcalculator.HarmonicBias()
     
     if args.method == "WHAM":
-        calc = Wham1d(bias, maxiter=args.maxiter, tol=args.tol, nbins=args.nbins,
-                  temperature=args.temperature,
-                  x0=x0, fcx=kx,chkdur=args.chkdur)
+        calc = WhamNd(temperature=args.temperature)
     elif args.method == "ZHU":
-        calc = Zhu1d(bias, maxiter=1, tol=args.tol, nbins=args.nbins,
-                  temperature=args.temperature,
-                  x0=x0, fcx=kx, g_k=ineff, chkdur=args.chkdur)
+        calc = ZhuNd(temperature=args.temperature)
     else:
         logger.error("method %s not implimented yet, please choose between WHAM or ZHU")
         raise SystemExit()
     
     if not os.path.isfile(args.histfile):
         logger.info("histogram file %s not found", args.histfile)
-        calc.make_histogram(pos_kn=pos_kn, N_k=N_k, binrange=args.binrange)
+        calc.make_ndhistogram(observ = observ, cv_ranges=binranges, number_bins=prj.nbins)
         calc.write_histogram(args.histfile)
     else:
         logger.info("Will use %s", args.histfile)
-        
-    calc.estimateFreeEnergy(histogramfile=args.histfile,
-                                   fefile=args.fefile,g_k=ineff,
-                                   setToZero = args.setToZero)
+        calc.load_histogram(args.histfile)
     
-    calc.write_FreeEnergies(args.fefile)
+    
+    Ub = bpot.biasPotential(prj.biasType,prj.collvars,prj.vardict,calc.histEdges)
+    
+    calc.setParams(Ub,histogramfile=args.histfile, fefile = args.fefile,
+                        ineff = ineff, chkpointfile = args.chkpfile,
+                                  setToZero=setToZero)
+    
+    calc.estimateWeights()
+    
+    calc.writeWeights(args.fefile)
+    #calc.divideProbwithSine(dim=1)
     calc.write_probabilities(args.probfile)
     calc.probtopmf()
+    
     calc.write_pmf(args.pmffile)
     
     
     ####
     # do averaging according to correlations
-    if args.bAverage:
-        pos_kn = utils.smooth1D(pos_kn, ineff)
-    else:
-        logger.info("Subsampling without averaging")
-        
-    pos_kn,N_k = utils.subsample1D(pos_kn,N_k,ineff)
-    g_k = np.zeros_like(ineff) + 1.0
+#     if args.bAverage:
+#         pos_kn = utils.smooth1D(pos_kn, ineff)
+#     else:
+#         logger.info("Subsampling without averaging")
+
+    if args.nbootstrap > 0:
+        subObserv = utils.subsample(observ,ineff)
+    else: 
+        pass
+    
+    newIneff = np.zeros_like(ineff) + 1.0
     for i in range(args.bootbegin, args.nbootstrap):
         logger.info(" Bootstrap iteration: %d ", i + 1)
         histfilename = args.histfile.replace(".npz", str(i) + ".npz")
@@ -156,18 +187,21 @@ def main(args):
         
         if not os.path.isfile(histfilename):
             logger.info("histogram file %s not found", histfilename)
-            sub_pos_kn = utils.generate_bootstrapsample1D(pos_kn, N_k)
-            calc.make_histogram(pos_kn=sub_pos_kn, N_k=N_k,
-                           binrange=args.binrange)
+            bootObserv = utils.bootstrap(subObserv)
+            calc.make_ndhistogram(observ=bootObserv, cv_ranges=binranges, number_bins=prj.nbins)
             calc.write_histogram(histfilename)
         else:
             logger.info("Will use %s", histfilename)
+
+        calc.setParams(Ub,histogramfile=histfilename, fefile = fefilename,
+                        ineff = newIneff, chkpointfile = args.chkpfile,
+                                  setToZero=setToZero)
+
             
-        calc.estimateFreeEnergy(histogramfile=histfilename,
-                                       fefile=fefilename,
-                                       g_k=g_k,setToZero = args.setToZero)
+        calc.estimateWeights()
         
-        calc.write_FreeEnergies(fefilename)
+        calc.writeWeights(fefilename)
+        #calc.divideProbwithSine(dim=1)
         calc.write_probabilities(probfilename)
         calc.probtopmf()
         calc.write_pmf(pmffilename)
