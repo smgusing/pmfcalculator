@@ -2,7 +2,6 @@
 import abc
 import numpy as np
 import logging, sys, os
-import time
 
 
 
@@ -40,15 +39,57 @@ class PmfNd(object):
         else:
             self.beta = 1.0 / (R * temperature)  # inverse temperature of simulations (in 1/(kJ/mol))
             self.temperature = temperature
-        logger.info("PmfNd successfully initialized")
+        logger.debug("PmfNd successfully initialized")
 
     @abc.abstractmethod
     def estimateWeights(self,**args):
         '''Abstract method for estimating weights'''
         return
 
+    def mask_outofrange(self, cv, cv_ranges=None ):
+        ''' Generate mask for cv where cv is out of cv_range
+        
+        Parameters
+        ------------
+            cv : array 
+                array with each column as component of vector
+            cv_ranges: list of tuples
+                each tuple contains min,max for the dimension
+        Returns
+        ------------
+            cv_mask: array dtype(bool)
+                mask for rows where all components that are 
+                within range are set to true
+            cv_ranges: list of tuples
+                each tuple contains min,max for the dimension
+       '''
+        idx =  np.ones(cv.shape[0],dtype=np.bool)
+        cv_mask = np.zeros(cv.shape[0], dtype=np.bool)
 
-    def make_ndhistogram(self, observ, cv_ranges=None,number_bins=None,ineff = None):
+        if cv_ranges is None:
+            logger.info("Using automatic determination of ranges")
+            cv_ranges = [ (i, j)   for i, j in zip(cv.min(axis=0), cv.max(axis=0))]
+            logger.debug("ranges %s ", cv_ranges)
+        
+        else:
+            logger.debug("Using provided ranges %s", cv_ranges)
+            # create mask for data outside the range in ANY dimension
+            for i in range(cv.shape[1]):
+                idx = idx * (cv[:, i] >= cv_ranges[i][0]) * (cv[:, i] <= cv_ranges[i][1])
+           
+            npoints = np.count_nonzero(idx)
+            if  npoints == 0:
+                logger.error("No samples considered. Check your ranges \n ")
+                raise SystemExit("Exiting .. Sorry!")
+            else:
+                pass
+        
+        cv_mask[idx] = True
+        
+        return cv_mask
+       
+
+    def make_ndhistogram(self, observ, cv_ranges=None, number_bins=None, ineff = None):
         ''' Construct histogram
 
         Parameters
@@ -79,29 +120,16 @@ class PmfNd(object):
         # Make 2D array joining all the files. ncols =  number of cv, nrows= total number of observations
         cv = np.vstack(observ)
         nsamples,ncv = cv.shape
-        idx =  np.ones(nsamples,dtype=np.bool)
-        cv_mask = np.zeros(cv.shape[0], dtype=np.bool)
-
-        if cv_ranges is None:
-
-            logger.info("Using automatic determination of ranges")
-            cv_ranges = [ (i,j)   for i,j in zip(cv.min(axis=0),cv.max(axis=0))]
-            logger.debug("ranges %s ", cv_ranges)
-
+        
+        if number_bins == None:
+            number_bins = [50 for i in range(ncv)]
+        elif (len(number_bins) != ncv ):
+            logger.error("number of bin sizes do not match the dimensions of histogram")
+            raise SystemExit("Exiting")
         else:
-            logger.info("Using provided ranges %s",cv_ranges)
-
-            # create mask for data outside the range in ANY dimension
-            for i in range(ncv):
-                idx= idx * ( cv[:,i] >= cv_ranges[i][0]) * (cv[:,i] <= cv_ranges[i][1])
-            npoints = np.count_nonzero(idx)
-            if  npoints == 0:
-                logger.error("No samples considered. Check your ranges \n ")
-                raise SystemExit("Exiting .. Sorry!")
-            else:
-                pass
-
-        cv_mask[idx] = True
+            pass
+        
+        cv_mask = self.mask_outofrange(cv,cv_ranges)
 
         # determine number of samples considered from each simulation
         observCum = np.insert(np.cumsum(num_observ),0,0)
@@ -116,13 +144,6 @@ class PmfNd(object):
         logger.debug("Number of samples considered from each simulations %s",num_observ1)
         logger.debug("total number of simulations %s",num_observ.size)
 
-        if number_bins == None:
-            number_bins = [50 for i in range(ncv)]
-        elif (len(number_bins) != ncv ):
-            logger.error("number of bin sizes do not match the dimensions of histogram")
-            raise SystemExit("Exiting")
-        else:
-            pass
 
 
         hist_ranges=[]
@@ -307,13 +328,7 @@ class PmfNd(object):
         '''
         logger.info("loading data from histogram file: %s", histfile)
         a = np.load(histfile)
-
-        hist, histEdges, sim_samples, sim_samples_used, cv_mask  = a['arr_0'], a['arr_1'], a['arr_2'], a['arr_3'],a['arr_4']
-        self.hist = hist
-        self.histEdges = histEdges
-        self.sim_samples = sim_samples
-        self.sim_samples_used = sim_samples_used
-        self.cv_mask = cv_mask
+        self.hist, self.histEdges, self.sim_samples, self.sim_samples_used, self.cv_mask = a['arr_0'], a['arr_1'], a['arr_2'], a['arr_3'],a['arr_4']
 
     def load_pmf(self,filename):
         ''' load PMF profile from file.
@@ -332,6 +347,10 @@ class PmfNd(object):
         np.savez(histfile, self.hist, self.histEdges, self.sim_samples, self.sim_samples_used, self.cv_mask )
 
         logger.info("histogram file %s saved", histfile)
+
+
+
+        
 
     ################################################
     # old code, works with 2d, Need to fix for Nd

@@ -1,38 +1,45 @@
-###################################################################################
-pmfcalculator: A package to compute 1D and 2D potential of mean force profiles
-##################################################################################
-LICENSE:
-See LICENSE.txt
+===============================================
+pmfcalculator: A package to compute PMF profiles from biased simulations
+===============================================
+
+:Author: Gurpreet Singh and Alex Chen
+:Contact: togurpreet@gmail.com
+:License: Read LICENSE.txt 
+
+-----------------------------------------------
+Introduction
+----------------------------------------------- 
+pmfcalculator is a python module that can be used for computing  N dimensional potential of mean force profiles
+ from the biased simulations.
+Currently two methods are implimented
+- Traditional WHAM
+- ZHU method
+
+-----------------------------------------------
+Installation
+-----------------------------------------------
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Prerequists
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- Numpy (developed using version 1.8.0)
+- PyYaml
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Quick install
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python setup.py install
 
 
-INSTALLATION:
+The installation script ``inst.sh`` is provided. Please modify it according to your environment.
+The script will **not** work as is.
 
-Installation prerequists:
-------------------------
-numpy
-cython
-pyYaml
--------------------------
+.. DANGER:: The script naively tries to remove the previous installation using ``rm`` command, **DO NOT USE IT WITHOUT MODIFICATIONS**.  
 
-Installation Instructions
----------------------------------------------
-python setup.py install --prefix $install_dir
-substitute $install_dir with directory location
- where you want this package to reside.
-----------------------------------------------
-
-
-USAGE:
-----------------------------------------------------------------------------------------------------------------------------------
-calc1dpmf.py and calc2dpmf.py are the main scripts that needs to be invoked to compute
-1d and 2d profiles respectively.
-
-For 1d profiles, only harmonic potentials are implimented
-For 2d profiles, harmonic and cosine potential are implimented
-
----------------------------------------------------------------------------------------------------------------------------------
-
-
+-------------------------------------------------
+Usage
+-------------------------------------------------
+Use ``calculatepmf.py -h`` for further help.
+   
 
 
 
