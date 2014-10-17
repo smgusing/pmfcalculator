@@ -25,27 +25,26 @@ def compute_stat_inefficiency(observ):
     logger.info("IACTS computed")
     return ineff
 
-def subsample(observ,ineff):
+def subsample(observ,maxIneff):
     ''' subsample according to largest inefff
     
-     Parameters
+    Parameters
     -------------
         observ: list of arrays
         ineff: array with ineff for each column of observ
-     Return
+        
+    Return
     -----------
         newObserv: list of arrays subsampled according to ineff
     '''
     logger.info("Subsampling using given ICATS")
     newObserv = [] 
-    maxineff = ineff.max(axis = 1)
     for i,sim in enumerate(observ):
         
-        indices = timeseries.subsampleCorrelatedData(sim, g = maxineff[i])
+        indices = timeseries.subsampleCorrelatedData(sim[:,0], g = maxIneff[i])
         newsim = sim[indices,...]
         newObserv.append(newsim)
-        logger.debug("Original %s New %s",sim.shape[0],newsim.shape[0])
- 
+    logger.debug("Original %s \nNew %s",[i.shape[0] for i in observ],[i.shape[0]  for i in newObserv])
     logger.info("Subsampled using given ICATS")
     return newObserv
 
@@ -54,19 +53,18 @@ def bootstrap(observ):
     
     Parameters
     ------------
-    observ: list of arrays
+        observ : list of arrays
+            observations from simulations
     
     Return
     --------
-    bootobserv: list of arrays
-    
+        bootobserv : list of arrays
     
     '''
     logger.info("Generating subsamples by random picking")
     bootObserv = []
     for sim in observ:
-        idx = np.arange(sim.shape[0])
-        ridx = nprand.choice(idx, replace = True)
+        ridx = nprand.choice(sim.shape[0],sim.shape[0],replace = True)
         newsim = sim[ridx,...]
         bootObserv.append(newsim)
 
@@ -115,18 +113,19 @@ def subsample2D(pos_xkn,pos_ykn,N_k,ineff):
     '''
     logger.info("Subsampling using given ICATS")
     K = pos_xkn.shape[0]
+    newNk = np.zeros_like(N_k)
     for i in range(K):
         indices = timeseries.subsampleCorrelatedData(pos_xkn[i,0:N_k[i]], g = ineff[i])
         newN = len(indices)
         pos_xkn[i,0:newN] = pos_xkn[i,indices]
         pos_ykn[i,0:newN] = pos_ykn[i,indices]
-        logger.debug("Original %s New %s",N_k[i],newN)
-        N_k[i] = newN
+        newNk[i] = newN
 #         if newN < 10:
 #             logger.warn("Very few independent samples %s",newN)
  
+    logger.debug("Original %s New %s",N_k,newNk)
     logger.info("Subsampled using given ICATS")
-    return pos_xkn,pos_ykn,N_k
+    return pos_xkn,pos_ykn,newNk
 
 def subsample1D(pos_kn,N_k,ineff):
     ''' Modifies pos_xkn,pos_ykn,N_k inplace

@@ -22,8 +22,10 @@ class WhamNd(PmfNd):
             Parameters:
 
         '''
-        curErr = 1.0 + self.tolerance
+        logger.info("Estimating Weights")
+        
         step = 0
+        curErr = 1.0 + self.tolerance
         feconst = 1.0
 
         f = np.copy(self.f)
@@ -52,15 +54,16 @@ class WhamNd(PmfNd):
         '''
 
         p = np.zeros(self.hist.shape)
-
+        
         for i,j in np.ndenumerate(p):
             denom = ( self.sim_samples_used * f * c[i]).sum()
-
             if denom > np.abs(np.finfo(float).eps):
                 p[i] = self.hist[i]/ denom
+            elif self.hist[i] == 0:
+                p[i] = 0.0
             else:
                 p[i] = np.inf
-
+                logger.error("!Infinity encountered! Histogram=%s,Denom=%s",self.hist[i],denom)
         return p
 
     def calcWeights(self,p,c):

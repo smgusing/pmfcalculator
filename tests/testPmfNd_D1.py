@@ -322,8 +322,8 @@ class testpmfNd_D1():
 
 if __name__ == "__main__":
     test = testpmfNd_D1()
-    calc = ZhuNd(temperature =300.0)
-    #calc = WhamNd(temperature =300.0)
+    #calc = ZhuNd(temperature =300.0)
+    calc = WhamNd(temperature =300.0)
 
     test.genpmf(calc)
     test.clean()

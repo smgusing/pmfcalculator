@@ -3,13 +3,185 @@ import numpy as np
 import logging
 from collections import defaultdict
 import sys
+from collections import namedtuple
 from ctypes import c_float
+import pickle as pk
 
-import pmfcalculator
-from pmfcalculator.pmf2d import Wham2d
+from pmfcalculator.pmfNd import PmfNd
 from gp_grompy import Gmxtc,matrix
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pmfcalculator")
+
+
+
+class Frameselector(PmfNd):
+    ''' Class to select and write multiple frames from multiple of trajectories
+        
+    '''
+    
+    def __init__(self, temperature=None):
+        super(Frameselector,self).__init__(temperature)
+        self._cvInfoType = namedtuple('CvInfo',['time','cv','idx','gridValue'])
+    
+    
+    def estimateWeights(self):
+        pass
+            
+    def _gridpoints_with_gridvalues(self,valueRange):
+        # Get bins from pmf that matches the criteria
+        # all the bins within width of minimum
+        pmf = np.copy(self.pmf)
+        notnan = ~np.isnan(pmf)
+        vmin,vmax = valueRange
+        ## wiered behaviour as nan values gives floating error
+        pmf[~notnan]=np.inf
+        withinRange = np.nonzero( (pmf >= vmin) * (pmf < vmax) )
+        selGridIdx = zip(*(withinRange))
+        logger.debug("Selected gridIndex %s",selGridIdx)
+            
+        return selGridIdx
+        
+
+    def _mapObservToGrid(self,observ,bTimeColumn=True):
+        ''' returns the bin index of the observation
+       
+        Parameters
+        ------------
+           observ :
+           edges :
+           mask :
+           bTimeColumn:
+                   
+        ''' 
+        if bTimeColumn == True:
+            time = observ[:,0]
+            cv = observ[:,1:]
+        else:
+            time = np.arange(observ.shape[0])
+            cv = observ
+        
+        cv_ranges = [(edge.min(),edge.max()) for edge in self.histEdges]
+        
+        cv_mask = self.mask_outofrange(cv,cv_ranges=cv_ranges)
+        
+        
+        indices=[]
+        for i,edge in enumerate(self.histEdges):
+            indices.append( np.digitize(cv[cv_mask,i],edge) ) 
+        
+        observMap = {}
+        for i,idx in enumerate(zip(*indices)):
+            try:
+                observMap[idx].append((time[i],cv[i]))
+            except KeyError:
+                observMap[idx] = [(time[i],cv[i])] 
+        
+        return observMap
+    
+    def observations_within_gridvalues(self, observations, selRange):
+        ''' Get bin numbers as a tuple that matches the criteria
+
+            Parameters
+            -------------
+                grid: array_like
+                    Nd grid 
+                edges: list of arrays
+                    each array is an edge of grid
+                    
+                width: float
+                    energy range is pmf.min() + width
+                
+            
+            Returns
+            --------------
+            selection: dict
+                run number as key and list of timeframes as value
+            refbins: list
+              list of tuples consisting of binids that match the criteria
+                
+        '''
+        # Read Data
+
+        selection = defaultdict(list)
+
+        selGridIdx = self._gridpoints_with_gridvalues(selRange)
+                
+        for i,sim in enumerate(observations):
+            mappedObserv = self._mapObservToGrid(sim, bTimeColumn=True)
+            for idx in selGridIdx:
+                if idx in mappedObserv:
+                    for time,cv in mappedObserv[idx]:
+                        cvInfo = self._cvInfoType(time=time, cv=cv, idx=idx, gridValue=self.pmf[idx])
+                        selection[i].append(cvInfo)
+        
+        self._selection = selection
+    
+    @property
+    def selectionItr(self):
+        for key in sorted(self._selection):
+            yield key, self._selection[key]
+        
+    
+    def writeToFile(self,chkpFn):
+        pk.dump(self._selection,open(chkpFn,'wb'))
+    
+    def loadFromFile(self,chkpFn):
+        self._selection = pk.load(open(chkpFn,'rb'))
+                     
+    def writeXtcfromselection(self, xtcfiles, xtcOutFn):
+        ''' Write xtc file containing frames that matched criteria
+        
+        '''
+        
+        xtcRead = Gmxtc()
+        xtcWrite = Gmxtc()
+        frno = 0
+        xtcWrite.open_xtc(xtcOutFn, 'w')
+        for runid, cvInfoList in self.selectionItr:
+            xtcInFn = xtcfiles[runid]
+            for cvInfo in cvInfoList:
+                logger.info("time %s",cvInfo.time)
+                xtcRead.read_timeframe(xtcInFn,time=cvInfo.time)
+                xtcWrite.copy(xtcRead)
+                xtcWrite.time = c_float(frno)
+                ret = xtcWrite.write_xtc()
+                xtcWrite.clear()
+                frno +=1
+        xtcWrite.close_xtc()
+        logger.info("xtc file %s written",xtcOutFn)
+        
+
+        
+#     def writeXtcfromselection(self,xtcOutFn='sel.xtc'):
+#         ''' Write xtc file containing frames that matched criteria
+#         
+#         '''
+#         
+#         xtcRead = Gmxtc()
+#         xtcWrite = Gmxtc()
+#         frno = 0
+#         xtcWrite.open_xtc(xtcOutFn, 'w')
+#         for runid, frameVars in self.selectionItr:
+#             xtcInFn = self.prjobj.xtcfiles[runid]
+#             for frtime,w in frameVars:
+#                 logger.info("time %s",frtime)
+#                 xtcRead.read_timeframe(xtcInFn,time=frtime)
+#                 xtcWrite.copy(xtcRead)
+#                 xtcWrite.time = c_float(frno)
+#                 ret = xtcWrite.write_xtc()
+#                 frno +=1
+#         xtcWrite.close_xtc()
+#         logger.info("xtc file %s written",xtcOutFn)
+    
+
+
+
+
+
+
+
+
+
 
 class Frameselector2d():
     ''' Class to select and write multiple frames from multiple of trajectories

@@ -102,24 +102,24 @@ class ZhuNd(PmfNd):
               temperature in kelvin
 
     '''
-    def __init__(self, temperature=None ):
+    def __init__(self, temperature=None, scIterations = 0, tolerance=1e-5):
 
         super(ZhuNd,self).__init__(temperature)
-
+        self.scIterations = scIterations
         logger.info("ZhuNd successfully initialized")
+        self.tolerance=tolerance
 
 
-
-    def estimateWeights(self,selfConsistentIterations = 0) :
+    def estimateWeights(self) :
         '''Compute 2D pmf using the given project and input arguments
         '''
         log_c = -self.beta*self.Ub
 
-        if selfConsistentIterations > 0:
-            wham = WhamNd(self.temperature)
+        if self.scIterations > 0:
+            wham = WhamNd(temperature=self.temperature,maxSteps=self.scIterations, tolerance=self.tolerance)
 
             wham.setParams(self.Ub,histogramfile=self.histFN)
-            wham.estimateWeights(maxSteps=selfConsistentIterations)
+            wham.estimateWeights()
             self.f = wham.f
 
         nonzero = self.f != 0.0
@@ -130,9 +130,14 @@ class ZhuNd(PmfNd):
         if globalVar_useScipy == True:
 
             res = opt.fmin_l_bfgs_b(calcA,x0=g,fprime=calcAder,args=(self.hist,
-                                                                      log_c,
-                                self.beta, self.sim_samples_used),factr=1,
+                                log_c, self.beta, self.sim_samples_used),factr=1,
                                     disp=10, bounds = bounds)
+
+#             res = opt.fmin_bfgs(calcA,x0=g,fprime=calcAder,args=(self.hist,
+#                                 log_c, self.beta, self.sim_samples_used),
+#                                 epsilon=1e-9,full_output=True)
+
+
             g = res[0]
 
         else:
@@ -145,15 +150,14 @@ class ZhuNd(PmfNd):
         self.f = f
 
         #self.prob = self.unbiasedProb(f,np.exp(log_c))
-        print f
-        if selfConsistentIterations > 0:
+        if self.scIterations > 0:
             wham.setParams(self.Ub,histogramfile=self.histFN,f=f)
-            wham.estimateWeights(maxSteps=selfConsistentIterations)
+            wham.estimateWeights()
+            self.f = wham.f
 
-        self.prob = self.unbiasedProb(f,np.exp(log_c))
-
+        self.prob = self.unbiasedProb(self.f,np.exp(log_c))
 
         logger.info("checkpointing")
-        np.savez(self.chkpointfile,wham.f)
+        np.savez(self.chkpointfile,self.f)
 
 

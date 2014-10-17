@@ -17,8 +17,7 @@ parser = argparse.ArgumentParser(description=des
 
 
 parser.add_argument("-weightfile", dest='weightInFn',
-        help='Weight file',
-        default="weight.txt")
+        help='Weight file. If no weight file given, equal weights to all frames will be given')
 
 parser.add_argument("-xtcfile", dest='xtcInFn',
         help='Input xtc file',
@@ -77,13 +76,15 @@ def main(args):
         
     gridCentShifted = tuple( [gridCenter[i] + args.shiftCenter[i] for i in range(3)] )
     
-    
-    frweights = np.loadtxt(args.weightInFn,dtype=np.float)
+    if args.weightInFn:
+        frweights = np.loadtxt(args.weightInFn,dtype=np.float)
+    else:
+        frweights = None
     
     grid = Grid3D(gridcenter=gridCentShifted, nbins=nbins,
                            gridwidth=gridwidth)
     
-    grid.calcDensityGmx(xtcInFn=args.xtcInFn,atomindices=grp3.indices,frameWeight=frweights)
+    grid.calcDensityGmx(xtcInFn=args.xtcInFn,atomindices=grp3.indices,frameWeights=frweights)
     grid.writeHistogram(args.histOutFn)
     
     
