@@ -3,6 +3,7 @@
 import numpy as np
 import logging
 from collections import defaultdict
+import itertools
 import sys
 
 from gp_grompy import Gmxtc,Gmstx,Gmndx
@@ -91,23 +92,28 @@ class Grid3D():
         return tuple(bins)
             
         
-    def calcDensityGmx(self,xtcInFn,atomindices,frameWeight):
+    def calcDensityGmx(self,xtcInFn,atomindices,frameWeights):
         ''' Calculate density of a given groupindex on the grid from xtc
         
         '''
         xtc=Gmxtc()
         xtc.open_xtc(xtcInFn, 'r')
         ret = xtc.read_first_xtc()
-        frameWeight = frameWeight/frameWeight.sum()
+        if frameWeights:
+            frameWeights = frameWeights/frameWeights.sum()
+            frameWeight = iter(frameWeights)
+        else:
+            frameWeight = itertools.repeat(1)
         frno=0
         while ret == 1:
             logger.info("Frame %d",frno)
             frame = xtc.x_to_array()
             selatoms = frame[atomindices,:]
-            H = self._callHistogram(selatoms)
-            self.histogram += H * frameWeight[frno]
+            H = self._callHistogram(selatoms) * frameWeight.next()
+            self.histogram += H 
             ret = xtc.read_next_xtc()
             frno+=1
+        self.histogram /= frno
         logger.info("Histogram calculated")
         
     def writeHistogram(self,npzOutFn="hist.npz"):
