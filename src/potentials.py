@@ -4,7 +4,7 @@ import numpy as np
 import itertools
 import sys
 ##################
-# autor: Alex Chen
+# author: Alex Chen
 
 ##################
 
